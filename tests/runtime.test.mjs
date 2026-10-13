@@ -145,4 +145,24 @@ test("extension loads independently and all discovery commands work without TUI"
     { messageType: "user", prompt: "Explain a small function" },
     ctx,
   );
+  const menus = [];
+  const tui = {
+    ...ctx,
+    mode: "tui",
+    hasUI: true,
+    ui: {
+      select: async (title, choices) => {
+        menus.push({ title, choices });
+        return choices.includes("Settings") ? "Settings" : "doctor";
+      },
+    },
+  };
+  await command.handler("", tui);
+  assert.equal(menus.length, 2);
+  assert.ok(menus[0].choices.includes("Settings"));
+  assert.equal(menus[1].title, "Settings");
+  assert.equal(JSON.parse(messages.at(-1).content).standalone, true);
+  const priorMessages = messages.length;
+  await command.handler("", { ...tui, ui: { select: async () => undefined } });
+  assert.equal(messages.length, priorMessages);
 });

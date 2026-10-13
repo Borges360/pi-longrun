@@ -159,6 +159,13 @@ function checkpoint(
   put(s, "checkpoints", cp.id, cp);
 }
 export class Longrun implements Service {
+  menuGroups = {
+    Run: ["status", "start", "pause", "resume", "stop"],
+    Progress: ["tasks", "inspect", "verify", "gate status", "gate verify"],
+    Recovery: ["recover"],
+    Settings: ["config", "doctor", "off"],
+  };
+  menuInputs = { start: "Goal to complete" };
   capabilities = ["task.ledger.v1", "task.checkpoint.v1", "gate.local.v1"];
   menu = [
     "status",
