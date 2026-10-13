@@ -17,6 +17,7 @@ import {
   now,
   redact,
   safeId,
+  assertNoSymlinkRoot,
 } from "./security.js";
 
 export interface StoredEvent {
@@ -344,9 +345,8 @@ export class FileStorage extends StorageBase {
   async open() {
     await mkdir(this.options.root, { recursive: true, mode: 0o700 });
     // Reject symlinked namespace roots instead of following them into another extension.
+    await assertNoSymlinkRoot(this.options.root);
     this.root = await realpath(this.options.root);
-    if (this.root.toLowerCase() !== join(this.options.root).toLowerCase())
-      throw new Error("symlink-storage-root");
     this.opened = true;
     try {
       await this.recover();

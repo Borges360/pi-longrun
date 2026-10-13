@@ -88,6 +88,17 @@ export function safeId(value: string): string {
     throw new Error("unsafe-identifier");
   return value;
 }
+/** Compare link metadata, not path spellings: Windows 8.3 aliases are not links. */
+export async function assertNoSymlinkRoot(path: string): Promise<void> {
+  let cursor = resolve(path);
+  while (true) {
+    if ((await lstat(cursor)).isSymbolicLink())
+      throw new Error("symlink-storage-root");
+    const parent = dirname(cursor);
+    if (parent === cursor) return;
+    cursor = parent;
+  }
+}
 export async function contained(
   root: string,
   path: string,
