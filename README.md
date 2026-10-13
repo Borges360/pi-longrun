@@ -78,3 +78,7 @@ verifiers; free-text claims remain unapplied suggestions. Inspect `status` and
 `explain` for the current ledger. The existing gate integration is documented in
 [LOCAL_GATES.md](LOCAL_GATES.md): `/longrun gate bind TASK-001`, `/gate use TASK-001`,
 then `/gate check`. Local verification remains mandatory.
+
+Git checkouts include the compiled worker and CLI. CI checks that a rebuild matches
+the committed distribution. Autoskills and subagent-router pin the Pi SDK as a runtime
+dependency for their isolated child process; the other extensions use the host SDK.
