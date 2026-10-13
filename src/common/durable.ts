@@ -9,7 +9,13 @@ import {
   type PortableSnapshot,
   type StoreOptions,
 } from "./storage.js";
-import { canonical, contained, digest, id } from "./security.js";
+import {
+  canonical,
+  contained,
+  digest,
+  id,
+  assertNoSymlinkRoot,
+} from "./security.js";
 type Document = { snapshot: string; sha256: string };
 /** Optional adapter pinned to Pi Durable 1.2.0. No agent loop or model is created. */
 export class DurableStorage extends StorageBase {
@@ -22,7 +28,9 @@ export class DurableStorage extends StorageBase {
   }
   async open() {
     if (this.opened) return;
+    await assertNoSymlinkRoot(this.options.root);
     await mkdir(this.options.root, { recursive: true, mode: 0o700 });
+    await assertNoSymlinkRoot(this.options.root);
     const ownerPath = await contained(
       this.options.root,
       "durable-owner.lock",

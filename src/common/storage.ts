@@ -343,6 +343,7 @@ export class FileStorage extends StorageBase {
     return hydrated;
   }
   async open() {
+    await assertNoSymlinkRoot(this.options.root);
     await mkdir(this.options.root, { recursive: true, mode: 0o700 });
     // Reject symlinked namespace roots instead of following them into another extension.
     await assertNoSymlinkRoot(this.options.root);
@@ -575,7 +576,9 @@ export class FileStorage extends StorageBase {
 export class SqliteStorage extends StorageBase {
   private db?: import("node:sqlite").DatabaseSync;
   async open() {
+    await assertNoSymlinkRoot(this.options.root);
     await mkdir(this.options.root, { recursive: true, mode: 0o700 });
+    await assertNoSymlinkRoot(this.options.root);
     const { DatabaseSync } = await import("node:sqlite");
     const path = await contained(this.options.root, "state.sqlite", true);
     this.db = new DatabaseSync(path);

@@ -92,8 +92,12 @@ export function safeId(value: string): string {
 export async function assertNoSymlinkRoot(path: string): Promise<void> {
   let cursor = resolve(path);
   while (true) {
-    if ((await lstat(cursor)).isSymbolicLink())
-      throw new Error("symlink-storage-root");
+    try {
+      if ((await lstat(cursor)).isSymbolicLink())
+        throw new Error("symlink-storage-root");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
     const parent = dirname(cursor);
     if (parent === cursor) return;
     cursor = parent;
