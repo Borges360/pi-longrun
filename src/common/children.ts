@@ -330,6 +330,20 @@ export class ChildDispatcher {
             .slice(0, 100)
             .map((value) => bound(value, 200));
         }
+        if (worktree && result.status !== "completed") {
+          result.openQuestions.push(
+            "Interrupted writes retained for explicit review: " + worktree,
+          );
+          await this.store.putRecord("child-results", request.id, result);
+          await this.store.putRecord("children", request.id, {
+            ...request,
+            status: result.status,
+            worktree,
+            needsReview: true,
+            updatedAt: now(),
+          });
+          return result;
+        }
         if (worktree) await this.worktrees!.finish(request, worktree, result);
         await this.store.putRecord("child-results", request.id, result);
         await this.store.putRecord("children", request.id, {

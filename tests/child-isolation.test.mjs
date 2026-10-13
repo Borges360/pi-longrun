@@ -93,6 +93,30 @@ test("write children archive results before cleanup; interrupted writes retain i
     (await store.getRecord("children", "interrupted")).worktree,
     "interrupted",
   );
+  const blocked = new ChildDispatcher(
+    store,
+    config,
+    async (r) => ({
+      schemaVersion: 1,
+      id: r.id,
+      status: "blocked",
+      summary: "worker killed",
+      verifiedFacts: [],
+      evidenceRefs: [],
+      filesRead: [],
+      filesChanged: [],
+      openQuestions: [],
+    }),
+    worktrees,
+  );
+  assert.equal(
+    (await blocked.dispatch(request("blocked-worker", "t3"))).status,
+    "blocked",
+  );
+  assert.ok(!order.includes("remove:blocked-worker"));
+  const retained = await store.getRecord("children", "blocked-worker");
+  assert.equal(retained.worktree, "blocked-worker");
+  assert.equal(retained.needsReview, true);
 });
 test(
   "parallel dispatch respects two workers and persists both independent results",
