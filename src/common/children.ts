@@ -1,4 +1,5 @@
 import { fork } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -181,16 +182,16 @@ export async function processRunner(
         resolve({ ...base, status: "blocked", summary: "cancelled" });
         return;
       }
-      const child = fork(
-        fileURLToPath(new URL("./child-worker.js", import.meta.url)),
-        [],
-        {
-          cwd: request.cwd,
-          env,
-          execArgv: [],
-          stdio: ["ignore", "ignore", "ignore", "ipc"],
-        },
-      );
+      const adjacentWorker = new URL("./child-worker.js", import.meta.url);
+      const worker = existsSync(adjacentWorker)
+        ? adjacentWorker
+        : new URL("../../dist/common/child-worker.js", import.meta.url);
+      const child = fork(fileURLToPath(worker), [], {
+        cwd: request.cwd,
+        env,
+        execArgv: [],
+        stdio: ["ignore", "ignore", "ignore", "ipc"],
+      });
       let settled = false;
       let timer: ReturnType<typeof setTimeout>;
       const finish = (result: ChildResult) => {
