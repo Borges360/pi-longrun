@@ -34,6 +34,8 @@ export interface CommandContext {
 export interface Service {
   capabilities: string[];
   menu: string[];
+  menuGroups?: Record<string, string[]>;
+  menuInputs?: Record<string, string>;
   command(
     action: string,
     args: string[],
@@ -342,14 +344,21 @@ export function register(
       const h = await get(ctx);
       let parts = args.trim().split(/\s+/).filter(Boolean);
       if (!parts.length && ctx.mode === "tui" && ctx.hasUI) {
-        const selected = await ctx.ui.select(extension, [
-          ...h.service.menu,
-          "config",
-          "doctor",
-          "off",
-        ]);
+        const groups = h.service.menuGroups ?? {
+          Actions: h.service.menu,
+          Settings: ["config", "doctor", "off"],
+        };
+        const group = await ctx.ui.select(extension, Object.keys(groups));
+        if (!group) return;
+        const selected = await ctx.ui.select(group, groups[group] ?? []);
         if (!selected) return;
-        parts = [selected];
+        parts = selected.split(/\s+/);
+        const inputTitle = h.service.menuInputs?.[selected];
+        if (inputTitle) {
+          const value = await ctx.ui.input(inputTitle);
+          if (!value?.trim()) return;
+          parts.push(value.trim());
+        }
       }
       let action = parts.shift() ?? "status";
       if (action === "config" && ctx.mode === "tui" && ctx.hasUI) {
