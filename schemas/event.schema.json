@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PiExtensionEventV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "eventId",
+    "eventType",
+    "source",
+    "correlationId",
+    "emittedAt",
+    "payload"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "eventId": {
+      "type": "string"
+    },
+    "eventType": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "correlationId": {
+      "type": "string"
+    },
+    "taskId": {
+      "type": "string"
+    },
+    "runId": {
+      "type": "string"
+    },
+    "projectKey": {
+      "type": "string"
+    },
+    "emittedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "payload": {}
+  }
+}

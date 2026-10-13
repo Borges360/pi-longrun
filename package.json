@@ -1,0 +1,83 @@
+{
+  "name": "@borges360/pi-longrun",
+  "version": "0.1.0",
+  "description": "pi-longrun \u2014 independent, evidence-driven Pi extension",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "keywords": [
+    "pi-package",
+    "pi-extension"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Borges360/pi-longrun.git"
+  },
+  "pi": {
+    "extensions": [
+      "./src/extension.ts"
+    ]
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./extension": "./dist/extension.js"
+  },
+  "bin": {
+    "pi-longrun": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "schemas",
+    "README.md",
+    "ARCHITECTURE.md",
+    "CONFIGURATION.md",
+    "SECURITY.md",
+    "MIGRATION.md",
+    "COMPATIBILITY.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "src",
+    "benchmarks",
+    "ACCEPTANCE.md",
+    "LOCAL_GATES.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "benchmark": "npm run build && node benchmarks/run.mjs",
+    "prepack": "npm run build",
+    "format": "prettier --write src tests benchmarks *.md",
+    "schemas": "npm run build && node scripts/generate-schema.mjs"
+  },
+  "dependencies": {
+    "fast-xml-parser": "5.11.2",
+    "typebox": "1.3.27",
+    "yaml": "2.9.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "1.2.0",
+    "@earendil-works/pi-durable": "1.2.0"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    },
+    "@earendil-works/pi-durable": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@earendil-works/chord": "1.2.0",
+    "@earendil-works/pi-coding-agent": "1.2.0",
+    "@earendil-works/pi-durable": "1.2.0",
+    "@types/node": "24.10.1",
+    "prettier": "3.9.10",
+    "typescript": "5.9.3"
+  }
+}
