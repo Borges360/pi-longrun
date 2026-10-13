@@ -1,0 +1,293 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "enabled",
+    "mode",
+    "storage",
+    "disabledIntegrations",
+    "maxActive",
+    "minScore",
+    "maxSkillTokens",
+    "maxAttempts",
+    "maxAutomaticTurns",
+    "maxOpenTasks",
+    "maxReplans",
+    "maxInitialTasks",
+    "maxDependencyDepth",
+    "maxHandoffTokens",
+    "maxEvidenceTokens",
+    "compactAtRatio",
+    "handoffAtRatio",
+    "targetRatio",
+    "maxCostUsd",
+    "maxToolCalls",
+    "maxParallel",
+    "maxDepth",
+    "maxChildrenPerTask",
+    "writeAccess",
+    "childTimeoutMs",
+    "maxChildTokens",
+    "credentialEnv",
+    "skillRoots",
+    "agentRoots",
+    "trustedProject",
+    "maxServersPerTask",
+    "maxDirectTools",
+    "defaultAccess",
+    "preferReadOnly",
+    "requireApproval",
+    "assistantClaims",
+    "requireEvidence",
+    "defaultProfile",
+    "maxRepairAttempts",
+    "gateTimeoutMs"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "mode": {
+      "anyOf": [
+        {
+          "type": "string",
+          "const": "auto"
+        },
+        {
+          "type": "string",
+          "const": "off"
+        },
+        {
+          "type": "string",
+          "const": "observe"
+        }
+      ]
+    },
+    "storage": {
+      "type": "object",
+      "required": [
+        "backend",
+        "root"
+      ],
+      "properties": {
+        "backend": {
+          "anyOf": [
+            {
+              "type": "string",
+              "const": "files"
+            },
+            {
+              "type": "string",
+              "const": "sqlite"
+            },
+            {
+              "type": "string",
+              "const": "durable"
+            }
+          ]
+        },
+        "root": {
+          "type": "string"
+        }
+      }
+    },
+    "disabledIntegrations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "maxActive": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20
+    },
+    "minScore": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "maxSkillTokens": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 12000
+    },
+    "maxAttempts": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "maxAutomaticTurns": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 20
+    },
+    "maxOpenTasks": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+    },
+    "maxReplans": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10
+    },
+    "maxInitialTasks": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 30
+    },
+    "maxDependencyDepth": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20
+    },
+    "maxHandoffTokens": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 8000
+    },
+    "maxEvidenceTokens": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 16000
+    },
+    "compactAtRatio": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 0.9
+    },
+    "handoffAtRatio": {
+      "type": "number",
+      "minimum": 0.2,
+      "maximum": 0.95
+    },
+    "targetRatio": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 0.9
+    },
+    "maxCostUsd": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "number",
+          "minimum": 0
+        }
+      ]
+    },
+    "maxToolCalls": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000
+    },
+    "maxParallel": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8
+    },
+    "maxDepth": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3
+    },
+    "maxChildrenPerTask": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "writeAccess": {
+      "type": "boolean"
+    },
+    "childTimeoutMs": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 600000
+    },
+    "maxChildTokens": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 32000
+    },
+    "credentialEnv": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "skillRoots": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "agentRoots": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "trustedProject": {
+      "type": "boolean"
+    },
+    "maxServersPerTask": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8
+    },
+    "maxDirectTools": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 50
+    },
+    "defaultAccess": {
+      "type": "string",
+      "const": "deny"
+    },
+    "preferReadOnly": {
+      "type": "boolean"
+    },
+    "requireApproval": {
+      "type": "boolean",
+      "const": true
+    },
+    "assistantClaims": {
+      "type": "boolean",
+      "const": false
+    },
+    "requireEvidence": {
+      "type": "boolean",
+      "const": true
+    },
+    "defaultProfile": {
+      "anyOf": [
+        {
+          "type": "string",
+          "const": "standard"
+        },
+        {
+          "type": "string",
+          "const": "strict"
+        }
+      ]
+    },
+    "maxRepairAttempts": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3
+    },
+    "gateTimeoutMs": {
+      "type": "integer",
+      "minimum": 10,
+      "maximum": 600000
+    }
+  },
+  "additionalProperties": false
+}
