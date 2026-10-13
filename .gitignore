@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.pi/
+coverage/
+*.tgz
+benchmark-results/
+
+.env
+.env.*
+!.env.example
+auth.json
+mcp-auth.json
+*.key
+*.pem
