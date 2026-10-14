@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,13 +8,12 @@ import { Interop, envelope } from "../dist/common/contracts.js";
 import { localBus } from "../dist/common/cli.js";
 import { defaults, validateConfig } from "../dist/common/config.js";
 import extension from "../dist/extension.js";
-const name = JSON.parse(
+const packageManifest = JSON.parse(
   await (
     await import("node:fs/promises")
   ).readFile(new URL("../package.json", import.meta.url), "utf8"),
-)
-  .name.split("/")
-  .at(-1);
+);
+const name = packageManifest.name.split("/").at(-1);
 test("event bus ignores duplicates, future schemas, old events and isolates consumer failures", async () => {
   const bus = localBus();
   const a = new Interop("a", bus, "project");
@@ -141,6 +140,7 @@ test("extension loads independently and all discovery commands work without TUI"
     await command.handler(action, ctx);
   assert.ok(messages.length >= 6);
   assert.equal(JSON.parse(messages.at(-1).content).enabled, true);
+  assert.equal(JSON.parse(messages[3].content).version, packageManifest.version);
   await handlers.get("before_agent_start")?.(
     { messageType: "user", prompt: "Explain a small function" },
     ctx,
@@ -162,6 +162,55 @@ test("extension loads independently and all discovery commands work without TUI"
   assert.ok(menus[0].choices.includes("Settings"));
   assert.equal(menus[1].title, "Settings");
   assert.equal(JSON.parse(messages.at(-1).content).standalone, true);
+  const configMenus = [];
+  const configTui = {
+    ...tui,
+    ui: {
+      select: async (title, choices) => {
+        configMenus.push({ title, choices });
+        if (choices.includes("Settings")) return "Settings";
+        if (choices.includes("config")) return "config";
+        return choices.find((choice) => choice.startsWith("Observe decisions"));
+      },
+    },
+  };
+  await command.handler("", configTui);
+  assert.equal(
+    configMenus[2].title,
+    "Settings · current: Enable automatic mode",
+  );
+  assert.equal(configMenus[2].choices[0], "Enable automatic mode (current)");
+  assert.equal(
+    JSON.parse(messages.at(-1).content.split("\n\n").at(-1)).mode,
+    "observe",
+  );
+  assert.match(
+    messages.at(-1).content,
+    /^Settings saved\. Observe decisions is now active\./,
+  );
+  const savedConfig = JSON.parse(
+    await readFile(join(defaults(name).storage.root, "config.json"), "utf8"),
+  );
+  assert.equal(savedConfig.mode, "observe");
+
+  configMenus.length = 0;
+  await command.handler("", {
+    ...configTui,
+    ui: {
+      select: async (title, choices) => {
+        configMenus.push({ title, choices });
+        if (choices.includes("Settings")) return "Settings";
+        if (choices.includes("config")) return "config";
+        return choices.find((choice) => choice.startsWith("Observe decisions"));
+      },
+    },
+  });
+  assert.equal(configMenus[2].title, "Settings · current: Observe decisions");
+  assert.equal(configMenus[2].choices[1], "Observe decisions (current)");
+  assert.match(
+    messages.at(-1).content,
+    /^Settings unchanged\. Observe decisions is already active\./,
+  );
   const priorMessages = messages.length;
   await command.handler("", { ...tui, ui: { select: async () => undefined } });
   assert.equal(messages.length, priorMessages);

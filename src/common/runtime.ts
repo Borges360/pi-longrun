@@ -173,9 +173,13 @@ export class Host {
   }
   async doctor() {
     const recovery = await this.store.recover();
+    const manifest = JSON.parse(
+      await readFile(new URL("../../package.json", import.meta.url), "utf8"),
+    ) as { version?: unknown };
     return {
       extension: this.extension,
-      version: "0.1.0",
+      version:
+        typeof manifest.version === "string" ? manifest.version : "unknown",
       pi: "1.2.0",
       node: process.versions.node,
       enabled: this.config.enabled,
@@ -325,10 +329,14 @@ export function register(
     await host.start();
     return host;
   };
-  const show = (value: unknown) =>
+  const show = (value: unknown, feedback?: string) =>
     pi.sendMessage({
       customType: extension,
-      content: JSON.stringify(redact(value), null, 2),
+      content: `${feedback ? `${feedback}\n\n` : ""}${JSON.stringify(
+        redact(value),
+        null,
+        2,
+      )}`,
       display: true,
     });
   pi.on("session_start", async (_e, ctx) => {
@@ -361,31 +369,48 @@ export function register(
         }
       }
       let action = parts.shift() ?? "status";
+      let feedback: string | undefined;
       if (action === "config" && ctx.mode === "tui" && ctx.hasUI) {
-        const setting = await ctx.ui.select("Settings", [
-          "Enable automatic mode",
-          "Observe decisions",
-          "Disable",
-        ]);
-        if (!setting) return;
-        action =
-          setting === "Enable automatic mode"
-            ? "auto"
-            : setting === "Observe decisions"
+        const activeAction =
+          !h.config.enabled || h.config.mode === "off"
+            ? "off"
+            : h.config.mode === "observe"
               ? "observe"
-              : "off";
+              : "auto";
+        const options = [
+          { action: "auto", label: "Enable automatic mode" },
+          { action: "observe", label: "Observe decisions" },
+          { action: "off", label: "Disable" },
+        ];
+        const labels = options.map(
+          ({ action: optionAction, label }) =>
+            `${label}${optionAction === activeAction ? " (current)" : ""}`,
+        );
+        const currentLabel =
+          options.find((option) => option.action === activeAction)?.label ??
+          "Unknown";
+        const setting = await ctx.ui.select(
+          `Settings · current: ${currentLabel}`,
+          labels,
+        );
+        const selectedIndex = labels.indexOf(setting ?? "");
+        if (selectedIndex < 0) return;
+        action = options[selectedIndex]!.action;
+        feedback =
+          activeAction === action
+            ? `Settings unchanged. ${currentLabel} is already active.`
+            : `Settings saved. ${options[selectedIndex]!.label} is now active.`;
       }
-      show(
-        await h.serial(() =>
-          h.command(action, parts, {
-            cwd: ctx.cwd,
-            trusted: ctx.isProjectTrusted(),
-            hostContext: ctx,
-            commandContext: ctx,
-            signal: ctx.signal,
-          }),
-        ),
+      const result = await h.serial(() =>
+        h.command(action, parts, {
+          cwd: ctx.cwd,
+          trusted: ctx.isProjectTrusted(),
+          hostContext: ctx,
+          commandContext: ctx,
+          signal: ctx.signal,
+        }),
       );
+      show(result, feedback);
     },
   });
   for (const t of tools)
