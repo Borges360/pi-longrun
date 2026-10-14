@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2 — 2026-10-13
+
+- Show the active setting and a clear save confirmation in the `/longrun config` menu.
+- Report the installed package version in `doctor` instead of a stale hard-coded version.
+
+
 ## 0.1.1 — 2026-10-13
 
 - Declare host-provided Pi SDK and Typebox packages as peer dependencies, preventing duplicate runtime copies and extension-loader warnings.
