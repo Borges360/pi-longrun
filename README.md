@@ -32,12 +32,11 @@ Run `/longrun` for the interactive menu, or `/longrun status` for structured
 headless output. Domain actions: `start <goal>, status, tasks, inspect [task], verify, pause, resume, recover, stop, explain, approve-command <json>, approve-human <requirement>, resolve <intent>`. Shared actions: `auto`, `off`,
 `observe`, `config`, `doctor`, `storage status`, `storage migrate files|sqlite|durable`.
 The CLI uses the same actions: `node dist/cli.js status`.
-TUI grouping: Execução / Progresso / Recuperação / Configurações. Choose
-**mode** to open a centered panel that explains the current and next mode. Press
-the Pi confirm key to cycle through Automático, Observar decisões and
-Desativado; each change is saved immediately with one redraw. The cancel key
-returns to Configurações, and **Voltar ao Longrun** returns to the group menu.
-`/longrun config` opens the same panel and then returns to Configurações.
+TUI groups: Execution / Progress / Recovery / Settings. Press Escape in a group
+to return to the categories; Escape in the categories closes the menu. Choose
+**mode** to open a centered panel showing the current mode and a short explanation
+of each option. Use the arrow keys to choose, Enter to save, and Escape to return
+to Settings. `/longrun config` opens the same panel and returns to Settings.
 Headless config returns validated settings. Edit the user config for advanced
 settings.
 

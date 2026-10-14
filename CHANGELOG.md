@@ -1,10 +1,16 @@
 # Changelog
 
+## 0.1.5 — 2026-10-14
+
++Replace the cycling mode screen with a keyboard-navigable list that marks the current mode and explains the selected option.
+Use Escape to move back through Settings and the category menu; remove the Back menu item.
+Keep all visible Longrun UI and instructions in English.
+
 ## 0.1.4 — 2026-10-13
 
-- Replace the mode screen with a centered, explanatory Portuguese panel and a single redraw after each saved change.
-- Keep the Longrun menu open after closing the mode panel; add explicit navigation back through Configurações and the group menu.
-- Localize Longrun menu group names and remove the duplicate direct disable action from Configurações.
+- Replace the mode screen with a centered English panel that lists all modes, highlights the current selection and explains the selected option.
+- Keep the Longrun menu open after closing the mode panel; use Escape to return through Settings and the group menu.
+- Use English menu group names and remove the duplicate direct disable action from Settings.
 
 ## 0.1.3 — 2026-10-13
 
@@ -17,12 +23,10 @@
 - Show the active setting and a clear save confirmation in the `/longrun config` menu.
 - Report the installed package version in `doctor` instead of a stale hard-coded version.
 
-
 ## 0.1.1 — 2026-10-13
 
 - Declare host-provided Pi SDK and Typebox packages as peer dependencies, preventing duplicate runtime copies and extension-loader warnings.
 - Resolve isolated child-worker modules from the active Pi installation.
-
 
 ## 0.1.0 — 2026-10-13
 
