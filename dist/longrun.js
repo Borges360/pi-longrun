@@ -51,7 +51,7 @@ export class Longrun {
         Run: ["status", "start", "pause", "resume", "stop"],
         Progress: ["tasks", "inspect", "verify", "gate status", "gate verify"],
         Recovery: ["recover"],
-        Settings: ["config", "doctor", "off"],
+        Settings: ["mode", "doctor", "off"],
     };
     menuInputs = { start: "Goal to complete" };
     capabilities = ["task.ledger.v1", "task.checkpoint.v1", "gate.local.v1"];

@@ -32,7 +32,10 @@ Run `/longrun` for the interactive menu, or `/longrun status` for structured
 headless output. Domain actions: `start <goal>, status, tasks, inspect [task], verify, pause, resume, recover, stop, explain, approve-command <json>, approve-human <requirement>, resolve <intent>`. Shared actions: `auto`, `off`,
 `observe`, `config`, `doctor`, `storage status`, `storage migrate files|sqlite|durable`.
 The CLI uses the same actions: `node dist/cli.js status`.
-TUI grouping: Run / Progress / Recovery / Settings. Config opens a small mode wizard in the TUI; headless config
+TUI grouping: Run / Progress / Recovery / Settings. Choose **mode** to open a
+single-button control that cycles through Automatic, Observe decisions and
+Disabled, saving each change immediately. Press the Pi confirm key to switch
+and the cancel key to close. `/longrun config` remains an alias; headless config
 returns validated settings. Edit the user config for advanced settings.
 
 Default state: `~/.pi/agent/state/pi-longrun/projects/<sha256-of-canonical-repository-root>/`.

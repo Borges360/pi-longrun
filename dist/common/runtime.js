@@ -276,7 +276,7 @@ export function register(pi, extension, command, factory, tools = []) {
             if (!parts.length && ctx.mode === "tui" && ctx.hasUI) {
                 const groups = h.service.menuGroups ?? {
                     Actions: h.service.menu,
-                    Settings: ["config", "doctor", "off"],
+                    Settings: ["mode", "doctor", "off"],
                 };
                 const group = await ctx.ui.select(extension, Object.keys(groups));
                 if (!group)
@@ -294,30 +294,100 @@ export function register(pi, extension, command, factory, tools = []) {
                 }
             }
             let action = parts.shift() ?? "status";
-            let feedback;
+            if (action === "mode")
+                action = "config";
             if (action === "config" && ctx.mode === "tui" && ctx.hasUI) {
-                const activeAction = !h.config.enabled || h.config.mode === "off"
+                let activeAction = !h.config.enabled || h.config.mode === "off"
                     ? "off"
                     : h.config.mode === "observe"
                         ? "observe"
                         : "auto";
                 const options = [
-                    { action: "auto", label: "Enable automatic mode" },
+                    { action: "auto", label: "Automatic" },
                     { action: "observe", label: "Observe decisions" },
-                    { action: "off", label: "Disable" },
+                    { action: "off", label: "Disabled" },
                 ];
-                const labels = options.map(({ action: optionAction, label }) => `${label}${optionAction === activeAction ? " (current)" : ""}`);
-                const currentLabel = options.find((option) => option.action === activeAction)?.label ??
-                    "Unknown";
-                const setting = await ctx.ui.select(`Settings · current: ${currentLabel}`, labels);
-                const selectedIndex = labels.indexOf(setting ?? "");
-                if (selectedIndex < 0)
-                    return;
-                action = options[selectedIndex].action;
-                feedback =
-                    activeAction === action
-                        ? `Settings unchanged. ${currentLabel} is already active.`
-                        : `Settings saved. ${options[selectedIndex].label} is now active.`;
+                const labelFor = (mode) => options.find((option) => option.action === mode)?.label ?? "Unknown";
+                const formatKey = (key) => key
+                    .split("+")
+                    .map((part) => ({ enter: "Enter", return: "Enter", escape: "Esc" })[part.toLowerCase()] ?? part.toUpperCase())
+                    .join("+");
+                await ctx.ui.custom((tui, theme, keybindings, done) => {
+                    let saving = false;
+                    let status = "Changes are saved immediately.";
+                    const confirmKeys = keybindings
+                        .getKeys("tui.select.confirm")
+                        .map(formatKey)
+                        .join(" / ") || "Enter";
+                    const cancelKeys = keybindings
+                        .getKeys("tui.select.cancel")
+                        .map(formatKey)
+                        .join(" / ") || "Esc";
+                    const fit = (line, width) => line.length <= width
+                        ? line
+                        : line.slice(0, Math.max(0, width - 1)) + "~";
+                    return {
+                        render(width) {
+                            const current = labelFor(activeAction);
+                            const nextIndex = (options.findIndex((option) => option.action === activeAction) +
+                                1) %
+                                options.length;
+                            const next = options[nextIndex].label;
+                            const lines = [
+                                "Longrun mode",
+                                "",
+                                `Current: ${current}`,
+                                "",
+                                saving
+                                    ? "[ SAVING ] Applying mode..."
+                                    : `[ ${confirmKeys} ] Switch to ${next}`,
+                                "Each press switches the mode and saves it immediately.",
+                                `${confirmKeys}: switch    ${cancelKeys}: close`,
+                                status,
+                            ];
+                            return lines.map((line, index) => {
+                                const visible = fit(line, width);
+                                return index === 0 || index === 4
+                                    ? theme.fg("accent", theme.bold(visible))
+                                    : visible;
+                            });
+                        },
+                        invalidate() { },
+                        async handleInput(data) {
+                            if (keybindings.matches(data, "tui.select.cancel")) {
+                                done(undefined);
+                                return;
+                            }
+                            if (saving ||
+                                !keybindings.matches(data, "tui.select.confirm"))
+                                return;
+                            const currentIndex = options.findIndex((option) => option.action === activeAction);
+                            const next = options[(currentIndex + 1) % options.length];
+                            saving = true;
+                            status = "Saving mode...";
+                            tui.requestRender();
+                            try {
+                                await h.serial(() => h.command(next.action, [], {
+                                    cwd: ctx.cwd,
+                                    trusted: ctx.isProjectTrusted(),
+                                    hostContext: ctx,
+                                    commandContext: ctx,
+                                    signal: ctx.signal,
+                                }));
+                                activeAction = next.action;
+                                status = `Saved. Current mode: ${labelFor(activeAction)}.`;
+                            }
+                            catch {
+                                status = "Could not save the mode. Try again.";
+                            }
+                            finally {
+                                saving = false;
+                                tui.requestRender();
+                            }
+                        },
+                    };
+                });
+                return;
             }
             const result = await h.serial(() => h.command(action, parts, {
                 cwd: ctx.cwd,
@@ -326,7 +396,7 @@ export function register(pi, extension, command, factory, tools = []) {
                 commandContext: ctx,
                 signal: ctx.signal,
             }));
-            show(result, feedback);
+            show(result);
         },
     });
     for (const t of tools)
