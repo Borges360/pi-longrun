@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.3 — 2026-10-13
+
+- Replace the ambiguous three-choice settings menu with a persistent, single-action mode switch.
+- Show the current mode and next mode; save and redraw immediately after each confirmation key press.
+- Expose `mode` in the Settings group while keeping `/longrun config` as an alias.
+
 ## 0.1.2 — 2026-10-13
 
 - Show the active setting and a clear save confirmation in the `/longrun config` menu.
