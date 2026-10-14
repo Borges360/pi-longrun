@@ -273,77 +273,87 @@ export function register(pi, extension, command, factory, tools = []) {
         handler: async (args, ctx) => {
             const h = await get(ctx);
             const interactive = ctx.mode === "tui" && ctx.hasUI;
+            const displayNames = {
+                longrun: "Longrun",
+                autoskills: "AutoSkills",
+                autoplan: "AutoPlan",
+                subagents: "Subagent Router",
+                mcprouter: "MCP Router",
+            };
+            const displayName = displayNames[command] ?? extension;
             const groups = h.service.menuGroups ?? {
-                Ações: h.service.menu,
-                Configurações: ["mode", "doctor"],
+                Actions: h.service.menu,
+                Settings: ["mode", "doctor"],
             };
             const options = [
                 {
                     action: "auto",
-                    label: "Automático",
-                    description: "Permite continuações automáticas para tarefas elegíveis.",
+                    label: "Automatic",
+                    description: h.service.modeDescriptions?.auto ??
+                        "Allow eligible actions when this extension's policy permits.",
                 },
                 {
                     action: "observe",
-                    label: "Observar decisões",
-                    description: "Observa o trabalho sem continuar automaticamente.",
+                    label: "Observe",
+                    description: h.service.modeDescriptions?.observe ??
+                        "Show decisions without acting automatically.",
                 },
                 {
                     action: "off",
-                    label: "Desativado",
-                    description: "Desativa as integrações automáticas do Longrun.",
+                    label: "Off",
+                    description: h.service.modeDescriptions?.off ??
+                        "Disable this extension's automatic behavior.",
                 },
             ];
-            const labelFor = (mode) => options.find((option) => option.action === mode)?.label ??
-                "Desconhecido";
-            const formatKey = (key) => key
-                .split("+")
-                .map((part) => ({ enter: "Enter", return: "Enter", escape: "Esc" })[part.toLowerCase()] ?? part.toUpperCase())
-                .join("+");
+            const formatKey = (key) => ({
+                enter: "Enter",
+                return: "Enter",
+                escape: "Esc",
+                "ctrl+c": "Ctrl+C",
+                up: "↑",
+                down: "↓",
+            })[key.toLowerCase()] ?? key.toUpperCase();
+            const keyText = (keys, fallback) => keys.map(formatKey).join(" / ") || fallback;
+            const currentMode = () => !h.config.enabled || h.config.mode === "off"
+                ? "off"
+                : h.config.mode === "observe"
+                    ? "observe"
+                    : "auto";
             const showModePanel = async () => {
-                let activeAction = !h.config.enabled || h.config.mode === "off"
-                    ? "off"
-                    : h.config.mode === "observe"
-                        ? "observe"
-                        : "auto";
+                let activeAction = currentMode();
+                let selectedIndex = options.findIndex((option) => option.action === activeAction);
+                let status = "";
                 await ctx.ui.custom((tui, theme, keybindings, done) => {
                     let saving = false;
-                    let status = "";
-                    const confirmKeys = keybindings
-                        .getKeys("tui.select.confirm")
-                        .map(formatKey)
-                        .join(" / ") || "Enter";
-                    const cancelKeys = keybindings
-                        .getKeys("tui.select.cancel")
-                        .map(formatKey)
-                        .join(" / ") || "Esc";
+                    const confirmKeys = keyText(keybindings.getKeys("tui.select.confirm"), "Enter");
+                    const cancelKeys = keyText(keybindings.getKeys("tui.select.cancel"), "Esc");
+                    const upKeys = keyText(keybindings.getKeys("tui.select.up"), "↑");
+                    const downKeys = keyText(keybindings.getKeys("tui.select.down"), "↓");
                     const fit = (line, width) => line.length <= width
                         ? line
-                        : line.slice(0, Math.max(0, width - 1)) + "~";
+                        : line.slice(0, Math.max(0, width - 1)) + "…";
                     return {
                         render(width) {
                             const current = options.find((option) => option.action === activeAction) ??
                                 options[0];
-                            const nextIndex = (options.findIndex((option) => option.action === activeAction) +
-                                1) %
-                                options.length;
-                            const next = options[nextIndex].label;
+                            const selected = options[selectedIndex];
                             const lines = [
-                                "Longrun / Configurações / Modo",
+                                `${displayName} / Settings / Mode`,
                                 "",
-                                "MODO ATUAL",
-                                current.label,
-                                current.description,
+                                `Current mode: ${current.label}`,
                                 "",
-                                "PRÓXIMA AÇÃO",
-                                `[ ${confirmKeys} ] Mudar para ${next}`,
-                                options[nextIndex].description,
-                                `${confirmKeys}: salvar    ${cancelKeys}: voltar às configurações`,
+                                "Choose a mode",
+                                ...options.map((option, index) => `${index === selectedIndex ? "›" : " "} ${option.label}${option.action === activeAction ? "  (current)" : ""}`),
+                                "",
+                                selected.description,
+                                "",
+                                `${upKeys} / ${downKeys} Move    ${confirmKeys} Save    ${cancelKeys} Back`,
                                 status,
                             ];
                             return lines.map((line, index) => {
                                 const visible = fit(line, width).padEnd(width, " ");
-                                const foreground = [0, 2, 6, 7].includes(index)
+                                const selectedRow = index === 5 + selectedIndex;
+                                const foreground = [0, 4].includes(index) || selectedRow
                                     ? theme.fg("accent", theme.bold(visible))
                                     : theme.fg("toolOutput", visible);
                                 return theme.bg("toolPendingBg", foreground);
@@ -355,24 +365,34 @@ export function register(pi, extension, command, factory, tools = []) {
                                 done(undefined);
                                 return;
                             }
+                            if (keybindings.matches(data, "tui.select.up")) {
+                                selectedIndex =
+                                    (selectedIndex + options.length - 1) % options.length;
+                                tui.requestRender();
+                                return;
+                            }
+                            if (keybindings.matches(data, "tui.select.down")) {
+                                selectedIndex = (selectedIndex + 1) % options.length;
+                                tui.requestRender();
+                                return;
+                            }
                             if (saving || !keybindings.matches(data, "tui.select.confirm"))
                                 return;
-                            const currentIndex = options.findIndex((option) => option.action === activeAction);
-                            const next = options[(currentIndex + 1) % options.length];
                             saving = true;
                             try {
-                                await h.serial(() => h.command(next.action, [], {
+                                const selected = options[selectedIndex];
+                                await h.serial(() => h.command(selected.action, [], {
                                     cwd: ctx.cwd,
                                     trusted: ctx.isProjectTrusted(),
                                     hostContext: ctx,
                                     commandContext: ctx,
                                     signal: ctx.signal,
                                 }));
-                                activeAction = next.action;
-                                status = `Salvo: ${labelFor(activeAction)}.`;
+                                activeAction = selected.action;
+                                status = `Saved: ${selected.label}.`;
                             }
                             catch {
-                                status = "Não foi possível salvar. Tente novamente.";
+                                status = "Could not save the mode. Try again.";
                             }
                             finally {
                                 saving = false;
@@ -394,13 +414,12 @@ export function register(pi, extension, command, factory, tools = []) {
                 let group = initialGroup;
                 while (true) {
                     if (!group) {
-                        group = await ctx.ui.select(extension, Object.keys(groups));
+                        group = await ctx.ui.select(displayName, Object.keys(groups));
                         if (!group)
                             return;
                     }
-                    const choices = [...(groups[group] ?? []), "Voltar ao Longrun"];
-                    const selected = await ctx.ui.select(group, choices);
-                    if (!selected || selected === "Voltar ao Longrun") {
+                    const selected = await ctx.ui.select(`${displayName} / ${group}`, groups[group] ?? []);
+                    if (!selected) {
                         group = undefined;
                         continue;
                     }
@@ -438,7 +457,7 @@ export function register(pi, extension, command, factory, tools = []) {
                 action = "config";
             if (action === "config" && interactive) {
                 await showModePanel();
-                await runMenu("Configurações");
+                await runMenu("Settings");
                 return;
             }
             const result = await h.serial(() => h.command(action, parts, {

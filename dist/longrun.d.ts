@@ -88,10 +88,15 @@ export declare function validateTasks(tasks: Array<{
 export declare class Longrun implements Service {
     readonly host: Host;
     menuGroups: {
-        Execução: string[];
-        Progresso: string[];
-        Recuperação: string[];
-        Configurações: string[];
+        Execution: string[];
+        Progress: string[];
+        Recovery: string[];
+        Settings: string[];
+    };
+    modeDescriptions: {
+        auto: string;
+        observe: string;
+        off: string;
     };
     menuInputs: {
         start: string;

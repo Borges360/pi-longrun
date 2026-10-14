@@ -14,6 +14,7 @@ export interface Service {
     menu: string[];
     menuGroups?: Record<string, string[]>;
     menuInputs?: Record<string, string>;
+    modeDescriptions?: Partial<Record<"auto" | "observe" | "off", string>>;
     command(action: string, args: string[], context: CommandContext): Promise<unknown>;
     start?(): Promise<void>;
     close?(): Promise<void>;
