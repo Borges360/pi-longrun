@@ -163,54 +163,80 @@ test("extension loads independently and all discovery commands work without TUI"
   assert.equal(menus[1].title, "Settings");
   assert.equal(JSON.parse(messages.at(-1).content).standalone, true);
   const configMenus = [];
+  const configPanels = [];
+  let panelClosed = false;
+  let renderRequests = 0;
+  const keybindings = {
+    getKeys: (binding) =>
+      binding === "tui.select.confirm" ? ["enter"] : ["escape"],
+    matches: (data, binding) =>
+      binding === "tui.select.confirm"
+        ? data === "enter"
+        : data === "escape",
+  };
   const configTui = {
     ...tui,
     ui: {
       select: async (title, choices) => {
         configMenus.push({ title, choices });
         if (choices.includes("Settings")) return "Settings";
-        if (choices.includes("config")) return "config";
-        return choices.find((choice) => choice.startsWith("Observe decisions"));
+        return "mode";
+      },
+      custom: async (factory) => {
+        const panel = await factory(
+          { requestRender: () => renderRequests++ },
+          { fg: (_color, value) => value, bold: (value) => value },
+          keybindings,
+          () => {
+            panelClosed = true;
+          },
+        );
+        configPanels.push(panel);
+        assert.match(panel.render(80).join("\n"), /Current: Automatic/);
+        assert.match(
+          panel.render(80).join("\n"),
+          /\[ Enter \] Switch to Observe decisions/,
+        );
+
+        await panel.handleInput("enter");
+        let view = panel.render(80).join("\n");
+        assert.match(view, /Current: Observe decisions/);
+        assert.match(view, /\[ Enter \] Switch to Disabled/);
+        let saved = JSON.parse(
+          await readFile(join(defaults(name).storage.root, "config.json"), "utf8"),
+        );
+        assert.equal(saved.mode, "observe");
+        assert.equal(saved.enabled, true);
+
+        await panel.handleInput("enter");
+        view = panel.render(80).join("\n");
+        assert.match(view, /Current: Disabled/);
+        assert.match(view, /\[ Enter \] Switch to Automatic/);
+        saved = JSON.parse(
+          await readFile(join(defaults(name).storage.root, "config.json"), "utf8"),
+        );
+        assert.equal(saved.mode, "off");
+        assert.equal(saved.enabled, false);
+
+        await panel.handleInput("enter");
+        view = panel.render(80).join("\n");
+        assert.match(view, /Current: Automatic/);
+        assert.match(view, /Saved\. Current mode: Automatic\./);
+        await panel.handleInput("escape");
       },
     },
   };
   await command.handler("", configTui);
-  assert.equal(
-    configMenus[2].title,
-    "Settings · current: Enable automatic mode",
-  );
-  assert.equal(configMenus[2].choices[0], "Enable automatic mode (current)");
-  assert.equal(
-    JSON.parse(messages.at(-1).content.split("\n\n").at(-1)).mode,
-    "observe",
-  );
-  assert.match(
-    messages.at(-1).content,
-    /^Settings saved\. Observe decisions is now active\./,
-  );
+  assert.equal(configMenus.length, 2);
+  assert.ok(configMenus[1].choices.includes("mode"));
+  assert.equal(configPanels.length, 1);
+  assert.equal(panelClosed, true);
+  assert.ok(renderRequests >= 6);
   const savedConfig = JSON.parse(
     await readFile(join(defaults(name).storage.root, "config.json"), "utf8"),
   );
-  assert.equal(savedConfig.mode, "observe");
-
-  configMenus.length = 0;
-  await command.handler("", {
-    ...configTui,
-    ui: {
-      select: async (title, choices) => {
-        configMenus.push({ title, choices });
-        if (choices.includes("Settings")) return "Settings";
-        if (choices.includes("config")) return "config";
-        return choices.find((choice) => choice.startsWith("Observe decisions"));
-      },
-    },
-  });
-  assert.equal(configMenus[2].title, "Settings · current: Observe decisions");
-  assert.equal(configMenus[2].choices[1], "Observe decisions (current)");
-  assert.match(
-    messages.at(-1).content,
-    /^Settings unchanged\. Observe decisions is already active\./,
-  );
+  assert.equal(savedConfig.mode, "auto");
+  assert.equal(savedConfig.enabled, true);
   const priorMessages = messages.length;
   await command.handler("", { ...tui, ui: { select: async () => undefined } });
   assert.equal(messages.length, priorMessages);
