@@ -80,5 +80,6 @@ verifiers; free-text claims remain unapplied suggestions. Inspect `status` and
 then `/gate check`. Local verification remains mandatory.
 
 Git checkouts include the compiled worker and CLI. CI checks that a rebuild matches
-the committed distribution. Autoskills and subagent-router pin the Pi SDK as a runtime
-dependency for their isolated child process; the other extensions use the host SDK.
+the committed distribution. Host-provided Pi packages, including the coding-agent SDK
+and Typebox, are declared as peer dependencies. Isolated child workers resolve the SDK
+from the active Pi installation.
