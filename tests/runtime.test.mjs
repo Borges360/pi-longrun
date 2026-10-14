@@ -140,12 +140,17 @@ test("extension loads independently and all discovery commands work without TUI"
     await command.handler(action, ctx);
   assert.ok(messages.length >= 6);
   assert.equal(JSON.parse(messages.at(-1).content).enabled, true);
-  assert.equal(JSON.parse(messages[3].content).version, packageManifest.version);
+  assert.equal(
+    JSON.parse(messages[3].content).version,
+    packageManifest.version,
+  );
   await handlers.get("before_agent_start")?.(
     { messageType: "user", prompt: "Explain a small function" },
     ctx,
   );
   const menus = [];
+  let rootSelections = 0;
+  let settingsSelections = 0;
   const tui = {
     ...ctx,
     mode: "tui",
@@ -153,90 +158,143 @@ test("extension loads independently and all discovery commands work without TUI"
     ui: {
       select: async (title, choices) => {
         menus.push({ title, choices });
-        return choices.includes("Settings") ? "Settings" : "doctor";
+        if (title === name)
+          return rootSelections++ === 0 ? "Configurações" : undefined;
+        if (choices.includes("Voltar ao Longrun"))
+          return settingsSelections++ === 0 ? "doctor" : "Voltar ao Longrun";
+        return undefined;
       },
     },
   };
   await command.handler("", tui);
-  assert.equal(menus.length, 2);
-  assert.ok(menus[0].choices.includes("Settings"));
-  assert.equal(menus[1].title, "Settings");
+  assert.equal(menus.length, 4);
+  assert.ok(menus[0].choices.includes("Configurações"));
+  assert.equal(menus[1].title, "Configurações");
   assert.equal(JSON.parse(messages.at(-1).content).standalone, true);
   const configMenus = [];
   const configPanels = [];
   let panelClosed = false;
   let renderRequests = 0;
+  let configRootSelections = 0;
+  let configSettingsSelections = 0;
   const keybindings = {
     getKeys: (binding) =>
       binding === "tui.select.confirm" ? ["enter"] : ["escape"],
     matches: (data, binding) =>
-      binding === "tui.select.confirm"
-        ? data === "enter"
-        : data === "escape",
+      binding === "tui.select.confirm" ? data === "enter" : data === "escape",
   };
   const configTui = {
     ...tui,
     ui: {
       select: async (title, choices) => {
         configMenus.push({ title, choices });
-        if (choices.includes("Settings")) return "Settings";
-        return "mode";
+        if (title === name)
+          return configRootSelections++ === 0 ? "Configurações" : undefined;
+        if (choices.includes("Voltar ao Longrun"))
+          return configSettingsSelections++ === 0
+            ? "mode"
+            : "Voltar ao Longrun";
+        return undefined;
       },
-      custom: async (factory) => {
+      custom: async (factory, options) => {
+        assert.equal(options.overlay, true);
         const panel = await factory(
           { requestRender: () => renderRequests++ },
-          { fg: (_color, value) => value, bold: (value) => value },
+          {
+            fg: (_color, value) => value,
+            bg: (_color, value) => value,
+            bold: (value) => value,
+          },
           keybindings,
           () => {
             panelClosed = true;
           },
         );
         configPanels.push(panel);
-        assert.match(panel.render(80).join("\n"), /Current: Automatic/);
+        const render = () =>
+          panel
+            .render(80)
+            .map((line) => line.trimEnd())
+            .join("\n");
+        assert.match(render(), /MODO ATUAL\nAutomático/);
         assert.match(
-          panel.render(80).join("\n"),
-          /\[ Enter \] Switch to Observe decisions/,
+          render(),
+          /PRÓXIMA AÇÃO\n\[ Enter \] Mudar para Observar decisões/,
         );
 
         await panel.handleInput("enter");
-        let view = panel.render(80).join("\n");
-        assert.match(view, /Current: Observe decisions/);
-        assert.match(view, /\[ Enter \] Switch to Disabled/);
+        let view = render();
+        assert.match(view, /MODO ATUAL\nObservar decisões/);
+        assert.match(view, /\[ Enter \] Mudar para Desativado/);
         let saved = JSON.parse(
-          await readFile(join(defaults(name).storage.root, "config.json"), "utf8"),
+          await readFile(
+            join(defaults(name).storage.root, "config.json"),
+            "utf8",
+          ),
         );
         assert.equal(saved.mode, "observe");
         assert.equal(saved.enabled, true);
 
         await panel.handleInput("enter");
-        view = panel.render(80).join("\n");
-        assert.match(view, /Current: Disabled/);
-        assert.match(view, /\[ Enter \] Switch to Automatic/);
+        view = render();
+        assert.match(view, /MODO ATUAL\nDesativado/);
+        assert.match(view, /\[ Enter \] Mudar para Automático/);
         saved = JSON.parse(
-          await readFile(join(defaults(name).storage.root, "config.json"), "utf8"),
+          await readFile(
+            join(defaults(name).storage.root, "config.json"),
+            "utf8",
+          ),
         );
         assert.equal(saved.mode, "off");
         assert.equal(saved.enabled, false);
 
         await panel.handleInput("enter");
-        view = panel.render(80).join("\n");
-        assert.match(view, /Current: Automatic/);
-        assert.match(view, /Saved\. Current mode: Automatic\./);
+        view = render();
+        assert.match(view, /MODO ATUAL\nAutomático/);
+        assert.match(view, /Salvo: Automático\./);
         await panel.handleInput("escape");
       },
     },
   };
   await command.handler("", configTui);
-  assert.equal(configMenus.length, 2);
+  assert.equal(configMenus.length, 4);
   assert.ok(configMenus[1].choices.includes("mode"));
+  assert.ok(configMenus[2].choices.includes("Voltar ao Longrun"));
   assert.equal(configPanels.length, 1);
   assert.equal(panelClosed, true);
-  assert.ok(renderRequests >= 6);
+  assert.equal(renderRequests, 3);
   const savedConfig = JSON.parse(
     await readFile(join(defaults(name).storage.root, "config.json"), "utf8"),
   );
   assert.equal(savedConfig.mode, "auto");
   assert.equal(savedConfig.enabled, true);
+
+  const directMenus = [];
+  await command.handler("config", {
+    ...tui,
+    ui: {
+      select: async (title, choices) => {
+        directMenus.push({ title, choices });
+        return title === "Configurações" ? "Voltar ao Longrun" : undefined;
+      },
+      custom: async (factory) => {
+        const panel = await factory(
+          { requestRender: () => {} },
+          {
+            fg: (_color, value) => value,
+            bg: (_color, value) => value,
+            bold: (value) => value,
+          },
+          keybindings,
+          () => {},
+        );
+        await panel.handleInput("escape");
+      },
+    },
+  });
+  assert.equal(directMenus[0].title, "Configurações");
+  assert.ok(directMenus[0].choices.includes("Voltar ao Longrun"));
+  assert.equal(directMenus[1].title, name);
   const priorMessages = messages.length;
   await command.handler("", { ...tui, ui: { select: async () => undefined } });
   assert.equal(messages.length, priorMessages);
