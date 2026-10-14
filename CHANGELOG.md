@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.4 — 2026-10-13
+
+- Replace the mode screen with a centered, explanatory Portuguese panel and a single redraw after each saved change.
+- Keep the Longrun menu open after closing the mode panel; add explicit navigation back through Configurações and the group menu.
+- Localize Longrun menu group names and remove the duplicate direct disable action from Configurações.
+
 ## 0.1.3 — 2026-10-13
 
 - Replace the ambiguous three-choice settings menu with a persistent, single-action mode switch.

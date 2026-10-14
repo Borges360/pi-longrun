@@ -347,138 +347,203 @@ export function register(
     host = undefined;
   });
   pi.registerCommand(command, {
-    description: `${extension}: status, explain, config, doctor`,
+    description: `${extension}: status, explain, mode/config, doctor`,
     handler: async (args, ctx) => {
       const h = await get(ctx);
-      let parts = args.trim().split(/\s+/).filter(Boolean);
-      if (!parts.length && ctx.mode === "tui" && ctx.hasUI) {
-        const groups = h.service.menuGroups ?? {
-          Actions: h.service.menu,
-          Settings: ["mode", "doctor", "off"],
-        };
-        const group = await ctx.ui.select(extension, Object.keys(groups));
-        if (!group) return;
-        const selected = await ctx.ui.select(group, groups[group] ?? []);
-        if (!selected) return;
-        parts = selected.split(/\s+/);
-        const inputTitle = h.service.menuInputs?.[selected];
-        if (inputTitle) {
-          const value = await ctx.ui.input(inputTitle);
-          if (!value?.trim()) return;
-          parts.push(value.trim());
-        }
-      }
-      let action = parts.shift() ?? "status";
-      if (action === "mode") action = "config";
-      if (action === "config" && ctx.mode === "tui" && ctx.hasUI) {
+      const interactive = ctx.mode === "tui" && ctx.hasUI;
+      const groups = h.service.menuGroups ?? {
+        Ações: h.service.menu,
+        Configurações: ["mode", "doctor"],
+      };
+      const options = [
+        {
+          action: "auto",
+          label: "Automático",
+          description:
+            "Permite continuações automáticas para tarefas elegíveis.",
+        },
+        {
+          action: "observe",
+          label: "Observar decisões",
+          description: "Observa o trabalho sem continuar automaticamente.",
+        },
+        {
+          action: "off",
+          label: "Desativado",
+          description: "Desativa as integrações automáticas do Longrun.",
+        },
+      ];
+      const labelFor = (mode: string) =>
+        options.find((option) => option.action === mode)?.label ??
+        "Desconhecido";
+      const formatKey = (key: string) =>
+        key
+          .split("+")
+          .map(
+            (part) =>
+              ({ enter: "Enter", return: "Enter", escape: "Esc" })[
+                part.toLowerCase()
+              ] ?? part.toUpperCase(),
+          )
+          .join("+");
+
+      const showModePanel = async () => {
         let activeAction =
           !h.config.enabled || h.config.mode === "off"
             ? "off"
             : h.config.mode === "observe"
               ? "observe"
               : "auto";
-        const options = [
-          { action: "auto", label: "Automatic" },
-          { action: "observe", label: "Observe decisions" },
-          { action: "off", label: "Disabled" },
-        ];
-        const labelFor = (mode: string) =>
-          options.find((option) => option.action === mode)?.label ?? "Unknown";
-        const formatKey = (key: string) =>
-          key
-            .split("+")
-            .map((part) =>
-              ({ enter: "Enter", return: "Enter", escape: "Esc" })[
-                part.toLowerCase()
-              ] ?? part.toUpperCase(),
-            )
-            .join("+");
+        await ctx.ui.custom<void>(
+          (tui, theme, keybindings, done) => {
+            let saving = false;
+            let status = "";
+            const confirmKeys =
+              keybindings
+                .getKeys("tui.select.confirm")
+                .map(formatKey)
+                .join(" / ") || "Enter";
+            const cancelKeys =
+              keybindings
+                .getKeys("tui.select.cancel")
+                .map(formatKey)
+                .join(" / ") || "Esc";
+            const fit = (line: string, width: number) =>
+              line.length <= width
+                ? line
+                : line.slice(0, Math.max(0, width - 1)) + "~";
 
-        await ctx.ui.custom<void>((tui, theme, keybindings, done) => {
-          let saving = false;
-          let status = "Changes are saved immediately.";
-          const confirmKeys =
-            keybindings
-              .getKeys("tui.select.confirm")
-              .map(formatKey)
-              .join(" / ") || "Enter";
-          const cancelKeys =
-            keybindings
-              .getKeys("tui.select.cancel")
-              .map(formatKey)
-              .join(" / ") || "Esc";
-          const fit = (line: string, width: number) =>
-            line.length <= width
-              ? line
-              : line.slice(0, Math.max(0, width - 1)) + "~";
+            return {
+              render(width) {
+                const current =
+                  options.find((option) => option.action === activeAction) ??
+                  options[0]!;
+                const nextIndex =
+                  (options.findIndex(
+                    (option) => option.action === activeAction,
+                  ) +
+                    1) %
+                  options.length;
+                const next = options[nextIndex]!.label;
+                const lines = [
+                  "Longrun / Configurações / Modo",
+                  "",
+                  "MODO ATUAL",
+                  current.label,
+                  current.description,
+                  "",
+                  "PRÓXIMA AÇÃO",
+                  `[ ${confirmKeys} ] Mudar para ${next}`,
+                  options[nextIndex]!.description,
+                  `${confirmKeys}: salvar    ${cancelKeys}: voltar às configurações`,
+                  status,
+                ];
+                return lines.map((line, index) => {
+                  const visible = fit(line, width).padEnd(width, " ");
+                  const foreground = [0, 2, 6, 7].includes(index)
+                    ? theme.fg("accent", theme.bold(visible))
+                    : theme.fg("toolOutput", visible);
+                  return theme.bg("toolPendingBg", foreground);
+                });
+              },
+              invalidate() {},
+              async handleInput(data) {
+                if (keybindings.matches(data, "tui.select.cancel")) {
+                  done(undefined);
+                  return;
+                }
+                if (saving || !keybindings.matches(data, "tui.select.confirm"))
+                  return;
 
-          return {
-            render(width) {
-              const current = labelFor(activeAction);
-              const nextIndex =
-                (options.findIndex((option) => option.action === activeAction) +
-                  1) %
-                options.length;
-              const next = options[nextIndex]!.label;
-              const lines = [
-                "Longrun mode",
-                "",
-                `Current: ${current}`,
-                "",
-                saving
-                  ? "[ SAVING ] Applying mode..."
-                  : `[ ${confirmKeys} ] Switch to ${next}`,
-                "Each press switches the mode and saves it immediately.",
-                `${confirmKeys}: switch    ${cancelKeys}: close`,
-                status,
-              ];
-              return lines.map((line, index) => {
-                const visible = fit(line, width);
-                return index === 0 || index === 4
-                  ? theme.fg("accent", theme.bold(visible))
-                  : visible;
-              });
-            },
-            invalidate() {},
-            async handleInput(data) {
-              if (keybindings.matches(data, "tui.select.cancel")) {
-                done(undefined);
-                return;
-              }
-              if (
-                saving ||
-                !keybindings.matches(data, "tui.select.confirm")
-              )
-                return;
-
-              const currentIndex = options.findIndex(
-                (option) => option.action === activeAction,
-              );
-              const next = options[(currentIndex + 1) % options.length]!;
-              saving = true;
-              status = "Saving mode...";
-              tui.requestRender();
-              try {
-                await h.serial(() =>
-                  h.command(next.action, [], {
-                    cwd: ctx.cwd,
-                    trusted: ctx.isProjectTrusted(),
-                    hostContext: ctx,
-                    commandContext: ctx,
-                    signal: ctx.signal,
-                  }),
+                const currentIndex = options.findIndex(
+                  (option) => option.action === activeAction,
                 );
-                activeAction = next.action;
-                status = `Saved. Current mode: ${labelFor(activeAction)}.`;
-              } catch {
-                status = "Could not save the mode. Try again.";
-              } finally {
-                saving = false;
-                tui.requestRender();
-              }
+                const next = options[(currentIndex + 1) % options.length]!;
+                saving = true;
+                try {
+                  await h.serial(() =>
+                    h.command(next.action, [], {
+                      cwd: ctx.cwd,
+                      trusted: ctx.isProjectTrusted(),
+                      hostContext: ctx,
+                      commandContext: ctx,
+                      signal: ctx.signal,
+                    }),
+                  );
+                  activeAction = next.action;
+                  status = `Salvo: ${labelFor(activeAction)}.`;
+                } catch {
+                  status = "Não foi possível salvar. Tente novamente.";
+                } finally {
+                  saving = false;
+                  tui.requestRender();
+                }
+              },
+            };
+          },
+          {
+            overlay: true,
+            overlayOptions: {
+              width: "72%",
+              maxHeight: 15,
+              anchor: "center",
+              margin: 1,
             },
-          };
-        });
+          },
+        );
+      };
+
+      const runMenu = async (initialGroup?: string) => {
+        let group = initialGroup;
+        while (true) {
+          if (!group) {
+            group = await ctx.ui.select(extension, Object.keys(groups));
+            if (!group) return;
+          }
+          const choices = [...(groups[group] ?? []), "Voltar ao Longrun"];
+          const selected = await ctx.ui.select(group, choices);
+          if (!selected || selected === "Voltar ao Longrun") {
+            group = undefined;
+            continue;
+          }
+
+          const selectedParts = selected.split(/\s+/);
+          const selectedAction = selectedParts[0] ?? "status";
+          if (selectedAction === "mode" || selectedAction === "config") {
+            await showModePanel();
+            continue;
+          }
+
+          const inputTitle = h.service.menuInputs?.[selected];
+          if (inputTitle) {
+            const value = await ctx.ui.input(inputTitle);
+            if (!value?.trim()) continue;
+            selectedParts.push(value.trim());
+          }
+          const menuAction = selectedParts.shift() ?? "status";
+          const result = await h.serial(() =>
+            h.command(menuAction, selectedParts, {
+              cwd: ctx.cwd,
+              trusted: ctx.isProjectTrusted(),
+              hostContext: ctx,
+              commandContext: ctx,
+              signal: ctx.signal,
+            }),
+          );
+          show(result);
+        }
+      };
+
+      let parts = args.trim().split(/\s+/).filter(Boolean);
+      if (interactive && parts.length === 0) {
+        await runMenu();
+        return;
+      }
+      let action = parts.shift() ?? "status";
+      if (action === "mode") action = "config";
+      if (action === "config" && interactive) {
+        await showModePanel();
+        await runMenu("Configurações");
         return;
       }
       const result = await h.serial(() =>
