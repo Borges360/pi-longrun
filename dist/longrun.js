@@ -48,10 +48,10 @@ function checkpoint(s, runId, taskId, phase) {
 export class Longrun {
     host;
     menuGroups = {
-        Run: ["status", "start", "pause", "resume", "stop"],
-        Progress: ["tasks", "inspect", "verify", "gate status", "gate verify"],
-        Recovery: ["recover"],
-        Settings: ["mode", "doctor", "off"],
+        Execução: ["status", "start", "pause", "resume", "stop"],
+        Progresso: ["tasks", "inspect", "verify", "gate status", "gate verify"],
+        Recuperação: ["recover"],
+        Configurações: ["mode", "doctor"],
     };
     menuInputs = { start: "Goal to complete" };
     capabilities = ["task.ledger.v1", "task.checkpoint.v1", "gate.local.v1"];
