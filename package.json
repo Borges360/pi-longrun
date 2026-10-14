@@ -1,7 +1,7 @@
 {
   "name": "@borges360/pi-longrun",
-  "version": "0.1.0",
-  "description": "pi-longrun \u2014 independent, evidence-driven Pi extension",
+  "version": "0.1.1",
+  "description": "pi-longrun — independent, evidence-driven Pi extension",
   "type": "module",
   "license": "MIT",
   "engines": {
