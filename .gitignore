@@ -1,5 +1,6 @@
 node_modules/
-.pi/
+.pi/*
+!.pi/mcp.json
 coverage/
 *.tgz
 benchmark-results/
