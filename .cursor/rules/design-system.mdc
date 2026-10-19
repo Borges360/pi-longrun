@@ -1,0 +1,13 @@
+---
+description: Regras de uso do design system INTEIRO em UI.
+globs: **/*.{css,scss,sass,less,tsx,jsx,vue,svelte,html,astro}
+alwaysApply: false
+---
+<!-- harness-managed -->
+# Design system INTEIRO
+
+- Prefira tokens `var(--inteiro-*)` a cores e medidas literais.
+- Mudança de token acontece no IDS, não no consumidor; regenere skills e demo.
+- Não crie componente visual fora do design system sem justificar.
+- Antes de corrigir um consumidor, confirme que o token existe no IDS.
+- Rode a auditoria (`design_audit_project`) e trate o score como sinal.

@@ -1,0 +1,15 @@
+---
+description: Modelo de branches padronizado do harness.
+globs: **/*
+alwaysApply: true
+---
+<!-- harness-managed -->
+# Gitflow
+
+- `main` = produção; `develop` = integração.
+- Trabalho comum: `feature/<nome>` a partir de `develop`.
+- Release: `release/<versão>` a partir de `develop`.
+- Urgência: `hotfix/<nome>` a partir de `main`.
+- Árvore suja bloqueia início manual de branch. Neste repositório, o gancho leva a alteração para `feature/` se ela começar em `main` ou `develop`.
+- Merge local é `--no-ff` e exige confirmação.
+- Publicar (push/PR/tag) é sempre decisão humana.
