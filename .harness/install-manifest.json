@@ -1,0 +1,42 @@
+{
+  "schema": "harness/install/v1",
+  "project": "pi-longrun",
+  "runtimes": {
+    "pi": {
+      "sourceVersion": "0.3.0",
+      "skills": [
+        "harness-ci-jenkins",
+        "harness-design-system",
+        "harness-evolve",
+        "harness-gitflow",
+        "harness-multi-project",
+        "harness-operate",
+        "harness-quickstart"
+      ]
+    },
+    "codex": {
+      "sourceVersion": "0.3.0",
+      "skills": [
+        "harness-ci-jenkins",
+        "harness-design-system",
+        "harness-evolve",
+        "harness-gitflow",
+        "harness-multi-project",
+        "harness-operate",
+        "harness-quickstart"
+      ]
+    },
+    "cursor": {
+      "sourceVersion": "0.3.0",
+      "skills": [
+        "harness-ci-jenkins",
+        "harness-design-system",
+        "harness-evolve",
+        "harness-gitflow",
+        "harness-multi-project",
+        "harness-operate",
+        "harness-quickstart"
+      ]
+    }
+  }
+}

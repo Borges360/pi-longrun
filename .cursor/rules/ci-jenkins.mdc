@@ -1,0 +1,17 @@
+---
+description: Regras para Jenkinsfile e esteiras do Jenkins.
+globs: **/*Jenkinsfile*
+alwaysApply: false
+---
+<!-- harness-managed -->
+# Jenkins
+
+- Preserve checkout com `github-ssh`, known_hosts e o agente correto.
+- Falha de teste bloqueia publicação e deploy. `SKIP_TEST` exige `DRY_RUN=true`.
+- Orquestração canônica no Jenkies; comandos e testes no produto.
+- Identidade de implantação por produto e ambiente; recursos explícitos no catálogo.
+- `DRY_RUN` não altera o servidor remoto.
+- Segredo só via Secret (`MYSQL_PWD`, `PGPASSWORD`), nunca em `environment` literal.
+- Jobs nascem do repositório `homelab/jenkins`; publique com `jenkins_sync_pipelines`
+  e `confirm=true`.
+- O Compose do PC (porta 8085) é legado; `data/` guarda backup de credenciais.
