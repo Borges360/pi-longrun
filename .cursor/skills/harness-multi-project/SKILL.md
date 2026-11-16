@@ -11,7 +11,9 @@ em `harness.yaml` (`structural.operations`) e aplicadas por
 
 ## Regras
 
-- Sempre `dryRun=true` primeiro e apresente o plano (arquivo → ação por projeto).
+- Sempre rode `dryRun=true` primeiro e registre o plano (arquivo → ação por projeto).
+- Se a autorização local vigente já cobre os alvos e a operação, prossiga sem
+  repetir a pergunta; peça decisão apenas para escopo novo ou efeito remoto.
 - `skipped-exists` significa que o arquivo já existe e `overwrite=false`: respeite.
 - `managed-block` só substitui o trecho entre `<!-- harness:start -->` e
   `<!-- harness:end -->`; o resto do arquivo é do usuário.
@@ -22,8 +24,8 @@ em `harness.yaml` (`structural.operations`) e aplicadas por
 
 1. `harness structure list` para ver operações disponíveis.
 2. `harness structure apply --operations ...` sem `--write`.
-3. Revise o relatório; ajuste `appliesTo` se necessário.
-4. Abra `feature/` em cada projeto afetado.
+3. Revise o relatório e ajuste `appliesTo` se necessário; preserve o trabalho existente.
+4. Abra `feature/` em cada projeto afetado conforme o gitflow local.
 5. `harness structure apply --operations ... --write`.
 6. Rode os testes declarados no inventário dos projetos alterados.
 7. Commit por projeto; abra PR. Não publique sem pedido.

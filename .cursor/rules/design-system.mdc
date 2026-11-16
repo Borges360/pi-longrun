@@ -1,13 +1,13 @@
 ---
-description: Regras de uso do design system INTEIRO em UI.
+description: Regras de uso do design system escolhido explicitamente para esta superfície.
 globs: **/*.{css,scss,sass,less,tsx,jsx,vue,svelte,html,astro}
 alwaysApply: false
 ---
 <!-- harness-managed -->
-# Design system INTEIRO
+# Design system
 
-- Prefira tokens `var(--inteiro-*)` a cores e medidas literais.
-- Mudança de token acontece no IDS, não no consumidor; regenere skills e demo.
-- Não crie componente visual fora do design system sem justificar.
-- Antes de corrigir um consumidor, confirme que o token existe no IDS.
-- Rode a auditoria (`design_audit_project`) e trate o score como sinal.
+- Aplique apenas a projetos e superfícies com adoção explicitamente escolhida.
+- Metadados do harness, nomes de pacotes e proximidade com a fonte não autorizam adoção.
+- Em uma superfície adotada, prefira os tokens selecionados pelo projeto; alterações de tokens pertencem à fonte do design system.
+- READMEs de consumidores não devem anunciar adoção nem usar marca ou slogan do sistema.
+- A auditoria visual é um sinal; não classifique um projeto como adotante ou não adotante apenas pelo score.

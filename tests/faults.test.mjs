@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { fork, spawn } from "node:child_process";
 import {
+  appendFile,
   mkdtemp,
   rm,
   writeFile,
@@ -14,6 +15,9 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { FileStorage, SqliteStorage } from "../dist/common/storage.js";
 import { contained, projectKey } from "../dist/common/security.js";
+import { Host } from "../dist/common/runtime.js";
+import { localBus } from "../dist/common/cli.js";
+import { createService } from "../dist/longrun.js";
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), "pi-fault-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -63,6 +67,58 @@ test("actual process death after journal commit recovers acknowledged intent and
     "never-automatic",
   );
   await store.close();
+});
+test("forced Longrun restart blocks an unsettled external effect without replay", async (t) => {
+  const root = await fixture(t);
+  const projectRoot = join(root, "project");
+  const stateRoot = join(root, "state");
+  const marker = join(root, "external-effect.log");
+  await mkdir(projectRoot);
+  const runtime = pathToFileURL(
+    fileURLToPath(new URL("../dist/common/runtime.js", import.meta.url)),
+  ).href;
+  const longrun = pathToFileURL(
+    fileURLToPath(new URL("../dist/longrun.js", import.meta.url)),
+  ).href;
+  const cli = pathToFileURL(
+    fileURLToPath(new URL("../dist/common/cli.js", import.meta.url)),
+  ).href;
+  const worker = join(root, "longrun-crash.mjs");
+  await writeFile(
+    worker,
+    `import {appendFile} from 'node:fs/promises';import {Host} from ${JSON.stringify(runtime)};import {createService} from ${JSON.stringify(longrun)};import {localBus} from ${JSON.stringify(cli)};const [cwd,stateRoot,marker]=process.argv.slice(2);process.env.PI_ECOSYSTEM_STATE_ROOT=stateRoot;const host=new Host('pi-longrun',createService,cwd,localBus());await host.start();await host.service.startRun('Perform one external action');await host.service.toolCall({toolName:'external_write',toolCallId:'crash-before-result'});await appendFile(marker,'performed\\n');process.kill(process.pid,'SIGKILL');`,
+  );
+
+  const child = await runChild(worker, [projectRoot, stateRoot, marker]);
+  assert.notEqual(child.code, 0);
+  assert.equal(await readFile(marker, "utf8"), "performed\n");
+
+  const previousStateRoot = process.env.PI_ECOSYSTEM_STATE_ROOT;
+  process.env.PI_ECOSYSTEM_STATE_ROOT = stateRoot;
+  const host = new Host("pi-longrun", createService, projectRoot, localBus());
+  try {
+    await host.start();
+    const run = await host.service.currentRun();
+    const tasks = await host.service.tasks(run.id);
+    const intents = await host.store.listRecords("intents");
+    assert.equal(run.status, "blocked");
+    assert.equal(tasks.length, 1);
+    assert.equal(tasks[0].status, "blocked");
+    assert.match(tasks[0].blocker, /^needs-side-effect-review:/);
+    assert.equal(intents.length, 1);
+    assert.equal(intents[0].toolName, "external_write");
+    assert.equal(intents[0].settled, false);
+    assert.equal(intents[0].replay, "never-automatic");
+
+    const recovery = await host.service.recover();
+    assert.deepEqual(recovery.unsafeIntents, [intents[0].id]);
+    assert.equal(await readFile(marker, "utf8"), "performed\n");
+  } finally {
+    await host.close();
+    if (previousStateRoot === undefined)
+      delete process.env.PI_ECOSYSTEM_STATE_ROOT;
+    else process.env.PI_ECOSYSTEM_STATE_ROOT = previousStateRoot;
+  }
 });
 test("two separate writers acknowledge exactly one version and never lose an update", async (t) => {
   const root = await fixture(t);

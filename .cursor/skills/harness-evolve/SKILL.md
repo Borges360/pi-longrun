@@ -20,7 +20,7 @@ O harness registra observações em `.harness/observations.jsonl` (append-only).
 1. `harness evolve` para ver resumo e propostas.
 2. Revise cada proposta; aceite, adapte ou descarte com o usuário.
 3. Implemente a mudança em `harness.yaml` ou nas skills.
-4. Registre a decisão na memória do hub, se ela estiver conectada.
+4. Registre uma decisão na memória somente se houver pedido ou autorização explícita. Use o escopo do projeto por padrão; global/profile exigem escolha explícita.
 5. Valide com `harness doctor` e `node --test`.
 
 ## Limites

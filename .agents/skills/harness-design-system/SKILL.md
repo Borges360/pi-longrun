@@ -1,32 +1,34 @@
 ---
 name: "harness-design-system"
-description: "Trabalhar com o design system INTEIRO (IDS): consultar tokens, auditar drift de cores/estilos hardcoded, vincular um projeto ao MCP do design system e verificar integridade. Use quando o usuário mencionar design system, INTEIRO, tokens, inteiro.css, `.inteiro`, tema, cores, acessibilidade visual, drift de estilo, ou pedir para aplicar o padrão visual em um projeto."
+description: "Trabalhar com um design system explicitamente selecionado: consultar tokens, auditar drift e verificar integridade. Use quando o usuário pedir uma tarefa de design system, tokens, tema, cores ou acessibilidade visual; não infira adoção de metadados ou dependências."
 ---
 <!-- harness-managed -->
-# Design system INTEIRO
+# Design system
 
-O IDS (`C:\Users\felip\Desenvolvimento\IDS`) é a fonte da verdade. Publica
-`@inteiro/*` (tokens, design-system, react, mcp, cli). Consumidores conhecidos:
-marketing, review-recorder e revisor.
+O projeto fonte e os clientes disponíveis são os declarados no `harness.yaml`.
+Selecione o projeto e a superfície antes da consulta. Metadados ou dependências
+herdadas não comprovam adoção nem autorizam aplicar uma identidade visual.
 
 ## Operações
 
-Use o MCP do IDS (`defaults.designSystem.mcp` no inventário) para tokens,
-status, auditoria de drift e vínculo. Este repositório não expõe `design_*`.
+Use a integração declarada para o projeto fonte apenas quando a tarefa pedir
+essa superfície. Uma regra ou skill instalada não concede permissão de vínculo.
 
 ## Regras
 
-- Mudança de token acontece **no IDS**, nunca no consumidor. Regenerar skills e
-  demo depois (`npm run generate` no IDS).
-- Prefira `var(--inteiro-*)` a valores literais.
-- Antes de "corrigir" um consumidor, confirme se o token certo existe no IDS.
+- Mudança de token acontece na fonte declarada, nunca no consumidor. Atualize
+  artefatos derivados conforme o procedimento da fonte selecionada.
+- Prefira os tokens da superfície adotada a valores literais.
+- Antes de alterar um consumidor, confirme a adoção explícita e se o token certo
+  existe na fonte selecionada.
 - Auditoria é heurística: reporte-a como sinal, não como veredito.
 
 ## Fluxo
 
-1. Pelo MCP do IDS, veja status e integridade.
-2. Audite o projeto alvo.
-3. Se faltar vínculo, ligue pelo CLI do IDS.
-4. Corrija drift dentro de uma `feature/`, com testes visuais quando houver.
+1. Confirme projeto e superfície selecionados.
+2. Consulte status e integridade pela integração declarada.
+3. Audite apenas o projeto alvo autorizado.
+4. Só altere vínculo com autorização explícita para esse projeto e superfície.
+5. Corrija drift dentro de uma branch de trabalho, com testes visuais quando houver.
 
 Leia `references/drift.md` para interpretar o `driftScore`.

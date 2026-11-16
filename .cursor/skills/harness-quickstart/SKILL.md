@@ -11,9 +11,9 @@ Sem `--write`, o comando só mostra o plano.
 
 ## Passos
 
-1. Confirme com o usuário: `id`, `name`, `path`, `kind`, `remote`.
-2. `harness quickstart --id <id>` e apresente o plano.
-3. Repita com `--write`.
+1. Confira se o pedido já informa `id`, `name`, `path`, `kind` e `remote`; pergunte apenas pelos dados ausentes.
+2. `harness quickstart --id <id>` e revise o plano local.
+3. Aplique o plano sob a autorização vigente, sem repetir uma confirmação já concedida.
 4. `git init` + primeiro commit (o harness não commita por você).
 5. Crie `main` e `develop` localmente, sem push.
 6. `harness install --runtime <runtime> --target <id> --write`.

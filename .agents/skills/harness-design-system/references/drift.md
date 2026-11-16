@@ -4,7 +4,7 @@ A auditoria varre arquivos de estilo/código (ignorando `node_modules`, `dist`,
 `build`, `vendor`, `.next`, `target`, `public`, `storage`) e conta:
 
 - ocorrências de hex (`#abc`, `#aabbcc`) e `rgb()/hsl()`;
-- uso de `var(--...)` e de `--inteiro-*`.
+- uso de variáveis de design definidas pelo projeto.
 
 `driftScore = min(100, round(amostrasHardcoded / arquivosLidos * 1000))`.
 
@@ -12,8 +12,8 @@ A auditoria varre arquivos de estilo/código (ignorando `node_modules`, `dist`,
 | --- | --- | --- |
 | 0 | clean | nada |
 | 1–19 | low-drift | corrigir pontualmente |
-| 20–59 | medium-drift | abrir feature de adoção de tokens |
-| 60+ | high-drift | projeto não adotou o design system; planejar migração |
+| 20–59 | medium-drift | revisar amostras e decidir se há uma iniciativa de adoção |
+| 60+ | high-drift | revisar amostras e discutir a decisão; o score não prova adoção ou rejeição |
 
 ## Limitações
 

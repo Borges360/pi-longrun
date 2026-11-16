@@ -1,0 +1,6 @@
+schema: harness/skill-metadata/v1
+id: pi-longrun
+version: 1.0.0
+owner: pi-longrun
+source: "README.md, ARCHITECTURE.md, SECURITY.md, AGENTS.md, package.json, src/extension.ts, src/common/config.ts, src/common/runtime.ts"
+scope: "product-local; Pi, Codex and Cursor"

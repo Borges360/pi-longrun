@@ -14,6 +14,7 @@ export interface AcceptanceGateBinding {
 export declare class AcceptanceGateBridge {
     readonly host: Host;
     private unsubscribe?;
+    private unsubscribeContinuity?;
     private projectId;
     private sessionId;
     private seen;
@@ -23,6 +24,7 @@ export declare class AcceptanceGateBridge {
     constructor(host: Host);
     attach(context: ExtensionContext): Promise<void>;
     close(): void;
+    private continuityStatus;
     bind(runId: string, taskId: string): Promise<{
         instruction: string;
         schemaVersion: 1;

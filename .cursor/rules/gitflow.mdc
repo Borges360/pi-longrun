@@ -6,10 +6,9 @@ alwaysApply: true
 <!-- harness-managed -->
 # Gitflow
 
-- `main` = produção; `develop` = integração.
-- Trabalho comum: `feature/<nome>` a partir de `develop`.
-- Release: `release/<versão>` a partir de `develop`.
-- Urgência: `hotfix/<nome>` a partir de `main`.
-- Árvore suja bloqueia início manual de branch. Neste repositório, o gancho leva a alteração para `feature/` se ela começar em `main` ou `develop`.
+- Leia o `gitflow` do projeto em `harness.yaml`; nomes, base e exceções podem variar.
+- Use a CLI local do Git e o comando `harness gitflow` declarado para esse projeto.
+- Uma árvore suja exige preservar as alterações antes de abrir ou mudar branch.
+- Hooks automáticos variam por repositório; não presuma que uma branch será criada automaticamente.
 - Merge local é `--no-ff` e exige confirmação.
 - Publicar (push/PR/tag) é sempre decisão humana.

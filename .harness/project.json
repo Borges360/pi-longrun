@@ -9,7 +9,7 @@
   "runtime": "node",
   "worktreeOf": null,
   "commands": {
-    "install": null,
+    "install": "npm ci",
     "lint": "npm run lint",
     "test": "npm test",
     "build": "npm run build",
@@ -36,6 +36,7 @@
     "tokenEnv": "AI_MEMORY_TOKEN",
     "project": "pi-longrun"
   },
+  "designSystem": null,
   "guardrails": [],
   "pipelines": [],
   "memoryScopeVerified": false

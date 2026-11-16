@@ -17,7 +17,8 @@ O diagnóstico local não comprova proteção remota nem checks obrigatórios.
 - Implementação comum: `feature/<nome>` a partir de `develop`.
 - Preparação de versão: `release/<versão>` a partir de `develop`.
 - Correção urgente de produção: `hotfix/<nome>` a partir de `main`.
-- Neste repositório, edição com HEAD em `main` ou `develop` abre `feature/auto-<instante>` sozinha (`harness gitflow ensure`, `hooks/pre-commit` e o hook do Cursor). Não há push.
+- Hooks e automação de branch variam por repositório. Verifique o `harness.yaml`
+  e a configuração local; não presuma que uma branch será criada automaticamente.
 
 ## Guardas inegociáveis
 

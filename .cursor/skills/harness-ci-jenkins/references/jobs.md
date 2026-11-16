@@ -1,30 +1,16 @@
-# Mapa de jobs
+# Resolver jobs por projeto
 
-| Job | Projeto | Namespace | Observação |
-| --- | --- | --- | --- |
-| `ids-dev` | IDS | dev | build + testes + deploy (ids.lab) |
-| `sistemalux-dev` | sistemalux | dev | build + phpunit + scripts de banco + rollout |
-| `interview-dev` | interview | dev | PostgreSQL; `RUN_DB_SCRIPTS` |
-| `review-recorder-dev` | review-recorder | dev | build + testes |
-| `ai-memory-dev` | ai-memory | dev | UI + deploy (memory.lab/web) |
-| `revisor-dev` | revisor | dev | build + testes (.NET) |
-| `publishsys-dev` | publishsys | dev | build + deploy |
-| `clareza-dev` | clareza | dev | build + deploy |
-| `mcphub-dev` | mcphub | dev | espelho da imagem upstream + deploy; adaptadores têm testes próprios |
-| `lume-dev` | lume | dev | Java, frontend e deploy |
-| `conhecerse-dev` | conhecerse | dev | Java, frontend, scans, migrações e deploy |
-| `openbao-dev` | openbao | platform | espelho de imagem; não reinicia o cofre |
-| `openbao-mcp-dev` | openbao | platform | testes com cofre efêmero + imagem; sem deploy automático |
-| `deploy-publishsys` | publishsys | Hostinger | agente hostinger-agent |
-| `deploy-sistemalux` | sistemalux | Hostinger | Teste/Homologação/Produção |
+Use o identificador de projeto em `harness.yaml` e leia `pipelines[]` para
+resolver job, plataforma, arquivo fonte e finalidade. O inventário e o catálogo
+da plataforma são a fonte da topologia; esta referência não mantém uma segunda
+lista de jobs nem nomes de ambientes.
 
-Catálogo canônico: `jenkies/pipelines/catalog.json`. Caminhos por produto em
-`harness.yaml`, `pipelines`. Uma lista estática não comprova revisão publicada.
-
-Comandos úteis (via MCPHub configurado no projeto):
+Comandos úteis, quando disponíveis pela integração configurada no projeto:
 
 - `jenkins_job` — último build e histórico.
 - `jenkins_build_status` — número, resultado, duração.
 - `jenkins_console` — últimas linhas do log.
-- `jenkins_validate_pipeline` — sintaxe declarativa local contra o controller;
-  exige adapter atualizado e autenticação válida, sem publicar ou disparar build.
+- `jenkins_validate_pipeline` — sintaxe declarativa; não publica nem dispara build.
+
+Uma lista ou resposta local não comprova que a revisão está publicada ou ativa
+no host. Registre separadamente a fonte local e a prova remota autorizada.

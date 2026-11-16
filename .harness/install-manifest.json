@@ -5,6 +5,7 @@
     "pi": {
       "sourceVersion": "0.3.0",
       "skills": [
+        "grill-me",
         "harness-ci-jenkins",
         "harness-design-system",
         "harness-evolve",
@@ -17,6 +18,7 @@
     "codex": {
       "sourceVersion": "0.3.0",
       "skills": [
+        "grill-me",
         "harness-ci-jenkins",
         "harness-design-system",
         "harness-evolve",
@@ -29,6 +31,7 @@
     "cursor": {
       "sourceVersion": "0.3.0",
       "skills": [
+        "grill-me",
         "harness-ci-jenkins",
         "harness-design-system",
         "harness-evolve",

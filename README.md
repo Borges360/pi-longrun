@@ -28,16 +28,24 @@ classifier or Durable installation is required for the default file backend.
 
 ## Use
 
-Run `/longrun` for the interactive menu, or `/longrun status` for structured
-headless output. Domain actions: `start <goal>, status, tasks, inspect [task], verify, pause, resume, recover, stop, explain, approve-command <json>, approve-human <requirement>, resolve <intent>`. Shared actions: `auto`, `off`,
-`observe`, `config`, `doctor`, `storage status`, `storage migrate files|sqlite|durable`.
-The CLI uses the same actions: `node dist/cli.js status`.
-TUI groups: Execution / Progress / Recovery / Settings. Press Escape in a group
-to return to the categories; Escape in the categories closes the menu. Choose
-**mode** to open a centered panel showing the current mode and a short explanation
-of each option. Use the arrow keys to choose, Enter to save, and Escape to return
-to Settings. `/longrun config` opens the same panel and returns to Settings.
-Headless config returns validated settings. Edit the user config for advanced
+Run `/longrun` to open the interactive root panel immediately, or
+`/longrun status` for structured headless output. The panel keeps the
+Execution, Progress, Recovery and Settings groups, with every existing action
+available from its group. Press Enter to open a group or action list; Escape
+from an action list returns to the groups. `/longrun config` opens the Settings
+group directly. When the host cannot provide a custom panel, the grouped
+selection menus remain available as a fallback.
+
+Mode changes are drafts until you press Ctrl+S. Escape from a nested chooser
+returns to its parent. Escape with unsaved changes warns; press it again to
+discard. A failed save keeps the draft available for retry. Escape during an
+active action cancels it and keeps the panel usable; late results are ignored.
+Headless config returns validated settings. The CLI uses the same actions, for
+example `node dist/cli.js status`. Domain actions include `start <goal>, status,
+tasks, inspect [task], verify, pause, resume, recover, stop, explain,
+approve-command <json>, approve-human <requirement>, resolve <intent>`. Shared
+actions include `auto`, `off`, `observe`, `config`, `doctor`, `storage status`,
+and `storage migrate files|sqlite|durable`. Edit the user config for advanced
 settings.
 
 Default state: `~/.pi/agent/state/pi-longrun/projects/<sha256-of-canonical-repository-root>/`.

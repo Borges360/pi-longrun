@@ -193,6 +193,8 @@ export async function loadConfig(
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
   }
+  // UI language is a trusted-project preference and never part of user config.
+  delete (user as Record<string, unknown>).uiLanguage;
   if (trusted) {
     try {
       project = JSON.parse(
@@ -205,6 +207,7 @@ export async function loadConfig(
       if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
     }
   }
+  delete (project as Record<string, unknown>).uiLanguage;
   // Executable policy and privilege ceilings come only from user config or a user command.
   for (const key of [
     "storage",

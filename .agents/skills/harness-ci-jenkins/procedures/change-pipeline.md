@@ -1,18 +1,16 @@
 # Procedimento: alterar um Jenkinsfile
 
-1. Resolva o Jenkinsfile canônico no Jenkies pelo inventário; leia os comandos e testes no produto. Não mantenha uma segunda orquestração no produto.
-2. Abra uma branch `feature/<nome>` (nunca edite em main). Neste harness, o gitflow automático faz isso se o HEAD estiver em `main` ou `develop`.
+1. Resolva o arquivo canônico de pipeline e o projeto responsável em `harness.yaml`; leia os comandos e testes no produto. Não mantenha uma segunda orquestração no produto.
+2. Leia o estado e o gitflow do repositório antes de editar; preserve alterações existentes e não presuma comportamento de hooks.
 3. Regras obrigatórias do arquivo:
-   - checkout com `github-ssh` e known_hosts;
-   - agente correto (`hostinger-agent` quando for Hostinger);
+   - checkout e agente conforme a configuração autorizada do destino;
    - falha de teste bloqueia publicação e deploy; `SKIP_TEST` exige `DRY_RUN=true`;
-   - identidade de implantação exclusiva do projeto/ambiente, com nomes de recursos explícitos no catálogo;
+   - identidade de implantação exclusiva do projeto/ambiente, com recursos declarados no catálogo;
    - `DRY_RUN` não altera remoto;
-   - segredo só via Secret/`MYSQL_PWD`/`PGPASSWORD`.
-4. Rode `jenkins-rbac.py --check` quando houver implantação K3s, valide a sintaxe declarativa e os gates reais do produto. Não trate validação sintática como teste do pipeline.
-5. Abra PR; não faça push/merge sem pedido explícito.
-6. Depois do merge, publique o pipeline pelo MCP de Jenkins do hub, com confirmação.
-7. Confira o job; a primeira execução fica com `DRY_RUN=true`.
+   - credenciais usadas por referência ao mecanismo aprovado; não leia nem imprima valores.
+4. Execute apenas verificações locais declaradas e necessárias. Validação sintática não substitui os gates reais do produto.
+5. Push, PR, merge, publicação e execução de job exigem autorização específica para o efeito e destino.
+6. Se uma execução remota for autorizada, use o modo seguro definido pelo projeto e verifique o resultado e a saúde.
 
 ## Critério de aceite
 

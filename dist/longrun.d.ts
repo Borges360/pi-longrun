@@ -131,6 +131,21 @@ export declare class Longrun implements Service {
         unsafeIntents: string[];
         safeReplay: string[];
         unsafeGateIntents: string[];
+        pendingEffects: ({
+            kind: "tool";
+            id: string;
+            taskId: string;
+            toolName: string;
+            replay: "safe" | "never-automatic" | "idempotent-with-key";
+            createdAt: string;
+        } | {
+            kind: "gate";
+            id: string;
+            taskId: string | undefined;
+            requirementId: string;
+            replay: "safe" | "never-automatic";
+            createdAt: string;
+        })[];
         ok: boolean;
         recoveredCommits: number;
         repairedTail: boolean;
