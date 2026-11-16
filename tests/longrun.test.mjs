@@ -143,12 +143,23 @@ test("unsafe unfinished side effects block recovery and never replay automatical
   await service.toolCall({
     toolName: "external_write",
     toolCallId: "provider/call-1",
+    input: { value: "private-payload-not-for-handoff" },
   });
   const result = await service.recover();
   assert.equal(result.unsafeIntents.length, 1);
+  assert.equal(result.pendingEffects.length, 1);
+  assert.equal(result.pendingEffects[0].kind, "tool");
+  assert.equal(result.pendingEffects[0].id, result.unsafeIntents[0]);
+  assert.equal(result.pendingEffects[0].toolName, "external_write");
+  assert.equal("input" in result.pendingEffects[0], false);
   assert.equal((await service.currentRun()).status, "blocked");
   const task = (await service.tasks())[0];
   assert.match(task.blocker, /needs-side-effect-review/);
+  const handoff = await service.handoff();
+  const summary = JSON.parse(handoff.brief);
+  assert.equal(summary.pendingEffectsTotal, 1);
+  assert.equal(summary.pendingEffects[0].toolName, "external_write");
+  assert.doesNotMatch(handoff.brief, /private-payload-not-for-handoff/);
   await service.recover();
   assert.equal((await service.currentRun()).requiredBlockers, 1);
   assert.equal(

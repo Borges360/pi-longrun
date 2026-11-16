@@ -496,6 +496,24 @@ export class Longrun {
                 await this.host.store.putRecord("runs", run.id, run);
             }
         }
+        const pendingEffects = [
+            ...intents.map((intent) => ({
+                kind: "tool",
+                id: intent.id,
+                taskId: intent.taskId,
+                toolName: intent.toolName,
+                replay: intent.replay,
+                createdAt: intent.createdAt,
+            })),
+            ...gateIntents.map((intent) => ({
+                kind: "gate",
+                id: intent.id,
+                taskId: intent.taskId,
+                requirementId: intent.requirementId,
+                replay: intent.replay,
+                createdAt: intent.createdAt,
+            })),
+        ];
         return {
             ...recovery,
             unsafeIntents: intents
@@ -503,6 +521,7 @@ export class Longrun {
                 .map((i) => i.id),
             safeReplay: intents.filter((i) => i.replay === "safe").map((i) => i.id),
             unsafeGateIntents: gateIntents.map((intent) => intent.id),
+            pendingEffects,
         };
     }
     async handoff() {
@@ -510,6 +529,30 @@ export class Longrun {
         if (!run)
             return null;
         const tasks = await this.tasks(run.id);
+        const toolIntents = await this.host.store.listRecords("intents");
+        const gateIntents = await this.host.store.listRecords("gate-intents");
+        const pendingEffects = [
+            ...toolIntents
+                .filter((intent) => intent.runId === run.id && !intent.settled)
+                .map((intent) => ({
+                kind: "tool",
+                id: intent.id,
+                taskId: intent.taskId,
+                toolName: intent.toolName,
+                replay: intent.replay,
+                createdAt: intent.createdAt,
+            })),
+            ...gateIntents
+                .filter((intent) => intent.runId === run.id && !intent.settled)
+                .map((intent) => ({
+                kind: "gate",
+                id: intent.id,
+                taskId: intent.taskId,
+                requirementId: intent.requirementId,
+                replay: intent.replay,
+                createdAt: intent.createdAt,
+            })),
+        ];
         const evidence = [];
         for (const t of tasks.filter((t) => t.status === "accepted"))
             for (const ref of t.evidenceRefs.slice(-3)) {
@@ -533,6 +576,8 @@ export class Longrun {
                     status: t.status,
                     blocker: t.blocker,
                 })),
+                pendingEffectsTotal: pendingEffects.length,
+                pendingEffects: pendingEffects.slice(-16),
                 evidence: bound(JSON.stringify(evidence), this.host.config.maxEvidenceTokens),
             }), this.host.config.maxHandoffTokens),
         };
@@ -746,8 +791,8 @@ export class Longrun {
         const run = await this.currentRun();
         if (!run || run.status !== "active" || e.outcome !== "completed")
             return undefined;
-        // The bound acceptance-gate owns pending-check continuations. Never run a
-        // second repair loop or accept its summary as local verification evidence.
+        // A pending external check needs evidence from Gate. Wait for that result
+        // without running a repair loop or treating it as local verification.
         if (!(await this.acceptanceGate.ready(run.id)))
             return undefined;
         const verdict = await this.verify();

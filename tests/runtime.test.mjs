@@ -117,7 +117,7 @@ test("extension loads independently and all discovery commands work without TUI"
         },
       },
     ),
-    isProjectTrusted: () => false,
+    isProjectTrusted: () => true,
     getContextUsage: () => undefined,
     compact: () => {},
     signal: undefined,
@@ -162,7 +162,7 @@ test("extension loads independently and all discovery commands work without TUI"
         if (title === displayName)
           return rootSelections++ === 0 ? "Settings" : undefined;
         if (title === `${displayName} / Settings`)
-          return settingsSelections++ === 0 ? "doctor" : undefined;
+          return settingsSelections++ === 0 ? "Doctor" : undefined;
         return undefined;
       },
     },
@@ -173,7 +173,8 @@ test("extension loads independently and all discovery commands work without TUI"
   assert.equal(menus[1].title, `${displayName} / Settings`);
   assert.equal(menus[2].title, `${displayName} / Settings`);
   assert.equal(menus[3].title, displayName);
-  assert.ok(menus[1].choices.includes("mode"));
+  assert.ok(menus[1].choices.includes("Mode"));
+  assert.ok(menus[1].choices.includes("Language"));
   assert.equal(menus[1].choices.includes("Voltar ao Longrun"), false);
   assert.equal(JSON.parse(messages.at(-1).content).standalone, true);
   const configMenus = [];
@@ -206,7 +207,7 @@ test("extension loads independently and all discovery commands work without TUI"
       custom: async (factory, options) => {
         assert.equal(options.overlay, true);
         const panel = await factory(
-          { requestRender: () => renderRequests++ },
+          { requestRender: () => renderRequests++, terminal: { rows: 24 } },
           {
             fg: (_color, value) => value,
             bg: (_color, value) => value,
@@ -220,52 +221,136 @@ test("extension loads independently and all discovery commands work without TUI"
             .render(80)
             .map((line) => line.trimEnd())
             .join("\n");
-        assert.match(render(), new RegExp(`${displayName} / Settings / Mode`));
-        assert.match(render(), /Current mode: Automatic/);
-        assert.match(render(), /Choose a mode\n› Automatic  \(current\)/);
-        await panel.handleInput("down");
-        assert.match(render(), /› Observe/);
+        const waitFor = async (predicate, message) => {
+          for (let attempt = 0; attempt < 100; attempt++) {
+            if (predicate()) return;
+            await new Promise((resolve) => setImmediate(resolve));
+          }
+          assert.fail(message);
+        };
+        const configPath = join(defaults(name).storage.root, "config.json");
         if (panelRuns++ === 0) {
+          assert.equal(render().includes(displayName), true);
+          for (const [group, expectedActions] of [
+            ["Execution", ["Status", "Start", "Pause", "Resume", "Stop"]],
+            ["Progress", ["Tasks", "Inspect", "Verify", "Gate status", "Gate verify"]],
+            ["Recovery", ["Recover"]],
+            ["Settings", ["Mode", "Doctor", "Language"]],
+          ]) {
+            await panel.handleInput("enter");
+            await waitFor(
+              () => render().includes(`${displayName} / ${group}`),
+              `${group} actions should open from the root menu`,
+            );
+            for (const action of expectedActions) assert.ok(render().includes(action));
+            await panel.handleInput("escape");
+            await panel.drain();
+            if (group !== "Settings") await panel.handleInput("down");
+          }
+        await panel.handleInput("enter");
+        await waitFor(
+          () => render().includes("Language"),
+          "the language action should appear in trusted project settings",
+        );
+        await panel.handleInput("down");
+        await panel.handleInput("down");
+        await panel.handleInput("enter");
+        await waitFor(
+          () => render().includes("Settings / Language"),
+          "language selection should open as a nested choice dialog",
+        );
+        await panel.handleInput("down");
+        await panel.handleInput("enter");
+        await panel.drain();
+        assert.match(render(), /Rascunho do idioma: Português \(Brasil\)/);
+        const projectLanguagePath = join(cwd, ".pi", `${name}.json`);
+        await assert.rejects(readFile(projectLanguagePath), { code: "ENOENT" });
+        await panel.handleInput("escape");
+        assert.match(render(), /Há alterações não salvas/);
+        await panel.handleInput("escape");
+          panel.close();
+          return;
+        }
+
+        assert.match(render(), new RegExp(`${displayName} / Settings`));
+        await panel.handleInput("enter");
+        await waitFor(
+          () => render().includes("Mode") && render().includes("Doctor"),
+          "the Settings group should open its actions",
+        );
+        assert.ok(render().includes("Mode"));
+        assert.ok(render().includes("Doctor"));
+        await panel.handleInput("enter");
+        await waitFor(
+          () => render().includes(`${displayName} / Settings / Mode`),
+          "mode should open as a nested choice dialog",
+        );
+        assert.match(render(), /Automatic/);
+        await panel.handleInput("down");
+        await panel.handleInput("enter");
+        await panel.drain();
+        assert.match(render(), /Mode draft: Observe/);
+        const unchanged = JSON.parse(await readFile(configPath, "utf8"));
+        assert.equal(unchanged.mode, "auto");
+        assert.equal(unchanged.enabled, true);
+        if (panelRuns === 2) {
           await panel.handleInput("escape");
-          const unchanged = JSON.parse(
-            await readFile(
-              join(defaults(name).storage.root, "config.json"),
-              "utf8",
-            ),
+          assert.match(render(), /Unsaved changes/);
+          assert.equal(
+            JSON.parse(await readFile(configPath, "utf8")).mode,
+            "auto",
           );
-          assert.equal(unchanged.mode, "auto");
-          assert.equal(unchanged.enabled, true);
+          await panel.handleInput("escape");
         } else {
           await panel.handleInput("enter");
-          assert.match(render(), /Current mode: Observe/);
-          assert.match(render(), /Saved: Observe\./);
-          const saved = JSON.parse(
-            await readFile(
-              join(defaults(name).storage.root, "config.json"),
-              "utf8",
-            ),
+          await waitFor(
+            () => render().includes("Language"),
+            "the language action should remain available after a mode draft",
           );
+          await panel.handleInput("down");
+          await panel.handleInput("down");
+          await panel.handleInput("enter");
+          await waitFor(
+            () => render().includes("Settings / Language"),
+            "language selection should open before saving both drafts",
+          );
+          await panel.handleInput("down");
+          await panel.handleInput("enter");
+          await panel.drain();
+          assert.match(render(), /Rascunho do idioma/);
+          assert.equal(
+            JSON.parse(await readFile(configPath, "utf8")).mode,
+            "auto",
+            "Ctrl+S has not been pressed yet",
+          );
+          await panel.handleInput("\u0013");
+          await panel.drain();
+          assert.match(render(), /Configurações salvas\./);
+          const saved = JSON.parse(await readFile(configPath, "utf8"));
           assert.equal(saved.mode, "observe");
           assert.equal(saved.enabled, true);
-          await panel.handleInput("escape");
+          const projectSaved = JSON.parse(
+            await readFile(join(cwd, ".pi", `${name}.json`), "utf8"),
+          );
+          assert.equal(projectSaved.uiLanguage, "pt-BR");
+          panel.close();
         }
       },
     },
   };
+  const dashboardTui = {
+    ...configTui,
+    ui: {
+      ...configTui.ui,
+      select: tui.ui.select,
+    },
+  };
+  await command.handler("", dashboardTui);
   await command.handler("config", configTui);
   await command.handler("config", configTui);
-  assert.equal(configMenus.length, 4);
-  assert.deepEqual(
-    configMenus.map(({ title }) => title),
-    [
-      `${displayName} / Settings`,
-      displayName,
-      `${displayName} / Settings`,
-      displayName,
-    ],
-  );
-  assert.equal(closedPanels, 2);
-  assert.equal(renderRequests, 3);
+  assert.equal(configMenus.length, 0);
+  assert.equal(closedPanels, 3);
+  assert.ok(renderRequests > 0);
   const savedConfig = JSON.parse(
     await readFile(join(defaults(name).storage.root, "config.json"), "utf8"),
   );
@@ -274,4 +359,32 @@ test("extension loads independently and all discovery commands work without TUI"
   const priorMessages = messages.length;
   await command.handler("", { ...tui, ui: { select: async () => undefined } });
   assert.equal(messages.length, priorMessages);
+  const fallbackMenus = [];
+  let rootChoice = 0;
+  let settingsChoice = 0;
+  await command.handler("", {
+    ...tui,
+    ui: {
+      select: async (title, choices) => {
+        fallbackMenus.push({ title, choices });
+        if (title === "Longrun")
+          return rootChoice++ === 0 ? "Configurações" : undefined;
+        if (title === "Longrun / Configurações")
+          return settingsChoice++ === 0 ? "Idioma" : undefined;
+        if (title.includes("/ Idioma — atual:")) return "English";
+        if (title === "Rascunho do idioma: English")
+          return "Descartar rascunho";
+        return undefined;
+      },
+    },
+  });
+  assert.equal(fallbackMenus[0].choices.includes("Configurações"), true);
+  assert.equal(fallbackMenus[1].choices.includes("Idioma"), true);
+  assert.equal(fallbackMenus[2].choices.includes("English"), true);
+  assert.equal(
+    JSON.parse(await readFile(join(cwd, ".pi", `${name}.json`), "utf8"))
+      .uiLanguage,
+    "pt-BR",
+    "discarding fallback language selection leaves the project preference unchanged",
+  );
 });

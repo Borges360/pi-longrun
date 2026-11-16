@@ -3,6 +3,7 @@ import { canonicalRepoRoot, digest, now, redact, safeId, } from "./common/securi
 export class AcceptanceGateBridge {
     host;
     unsubscribe;
+    unsubscribeContinuity;
     projectId = "";
     sessionId = "";
     seen = new Set();
@@ -29,13 +30,53 @@ export class AcceptanceGateBridge {
                 this.host.interop.failures++;
             });
         });
+        this.unsubscribeContinuity = this.host.bus.on("pi.compose.request.v2", (raw) => {
+            const request = raw;
+            if (request?.protocolVersion !== 2 ||
+                request.operation !== "describe" ||
+                request.source !== "pi-acceptance-gate" ||
+                request.target !== "pi-longrun" ||
+                request.projectKey !== this.projectId ||
+                request.sessionId !== this.sessionId ||
+                typeof request.requestId !== "string" ||
+                request.requestId.length > 64 ||
+                request.payload?.capability !== "execution.continue")
+                return;
+            const reply = (status) => {
+                this.host.bus.emit("pi.compose.result.v2", {
+                    protocolVersion: 2,
+                    messageId: crypto.randomUUID(),
+                    requestId: request.requestId,
+                    projectKey: this.projectId,
+                    sessionId,
+                    operation: "describe",
+                    emittedAt: now(),
+                    source: "pi-longrun",
+                    target: "pi-acceptance-gate",
+                    payload: { capability: "execution.continue", status },
+                });
+            };
+            reply("pending");
+            void this.continuityStatus().then(reply, () => reply("unknown")).catch(() => {
+                this.host.interop.failures++;
+            });
+        });
     }
     close() {
         this.unsubscribe?.();
         this.unsubscribe = undefined;
+        this.unsubscribeContinuity?.();
+        this.unsubscribeContinuity = undefined;
         this.seen.clear();
         this.latest = 0;
         this.binding = null;
+    }
+    async continuityStatus() {
+        if (!this.host.config.enabled || this.host.config.mode !== "auto")
+            return "idle";
+        const current = await this.host.store.getRecord("current", "run");
+        const run = current && await this.host.store.getRecord("runs", current.id);
+        return run && ["active", "paused", "blocked"].includes(run.status) ? "active" : "idle";
     }
     async bind(runId, taskId) {
         safeId(taskId);

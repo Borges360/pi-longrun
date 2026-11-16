@@ -181,6 +181,8 @@ export async function loadConfig(extension, cwd, trusted = false, override = {})
         if (e.code !== "ENOENT")
             throw e;
     }
+    // UI language is a trusted-project preference and never part of user config.
+    delete user.uiLanguage;
     if (trusted) {
         try {
             project = JSON.parse(await readFile(await contained(cwd, ".pi/" + extension + ".json", true), "utf8"));
@@ -190,6 +192,7 @@ export async function loadConfig(extension, cwd, trusted = false, override = {})
                 throw e;
         }
     }
+    delete project.uiLanguage;
     // Executable policy and privilege ceilings come only from user config or a user command.
     for (const key of [
         "storage",

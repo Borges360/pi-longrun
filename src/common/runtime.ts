@@ -17,12 +17,27 @@ import {
 import { DurableStorage } from "./durable.js";
 import { Interop, type EventBus } from "./contracts.js";
 import {
+  loadProjectLanguage,
+  resolveMessage,
+  saveProjectLanguage,
+  translate,
+  type MessageKey,
+  type MessageParams,
+  type UiLanguage,
+} from "./i18n.js";
+import {
   atomicWrite,
   canonical,
   digest,
   projectKey,
   redact,
 } from "./security.js";
+import {
+  openSettingsPanel,
+  type PanelCopy,
+  type PanelOptions,
+  type PanelRow,
+} from "./settings-panel.js";
 
 export interface CommandContext {
   cwd: string;
@@ -63,6 +78,8 @@ export const toolResult = (value: unknown) => ({
 });
 export class Host {
   config!: Config;
+  uiLanguage: UiLanguage = "en";
+  uiLanguageWarning?: "invalid" | "unavailable";
   store!: StorageBase;
   interop!: Interop;
   service!: Service;
@@ -99,6 +116,15 @@ export class Host {
   }
   private async initializeResources() {
     this.config = await loadConfig(this.extension, this.cwd, this.trusted);
+    if (this.extension === "pi-longrun") {
+      const preference = await loadProjectLanguage(
+        this.extension,
+        this.cwd,
+        this.trusted,
+      );
+      this.uiLanguage = preference.language;
+      this.uiLanguageWarning = preference.warning;
+    }
     this.key = await projectKey(this.cwd);
     const base = join(this.config.storage.root, "projects", this.key);
     await mkdir(base, { recursive: true, mode: 0o700 });
@@ -171,6 +197,13 @@ export class Host {
     });
     await saveConfig(this.extension, this.config);
     return this.config;
+  }
+  async saveUiLanguage(language: UiLanguage) {
+    if (this.extension !== "pi-longrun")
+      throw new Error("language-setting-not-supported");
+    await saveProjectLanguage(this.extension, this.cwd, this.trusted, language);
+    this.uiLanguage = language;
+    this.uiLanguageWarning = undefined;
   }
   async doctor() {
     const recovery = await this.store.recover();
@@ -315,7 +348,11 @@ export function register(
 ) {
   let host: Host | undefined;
   const get = async (ctx: ExtensionContext) => {
-    if (!host || host.cwd !== ctx.cwd) {
+    if (
+      !host ||
+      host.cwd !== ctx.cwd ||
+      (extension === "pi-longrun" && host.trusted !== ctx.isProjectTrusted())
+    ) {
       await host?.close();
       host = new Host(
         extension,
@@ -352,6 +389,14 @@ export function register(
     handler: async (args, ctx) => {
       const h = await get(ctx);
       const interactive = ctx.mode === "tui" && ctx.hasUI;
+      const localized = extension === "pi-longrun";
+      let uiLanguage = localized ? h.uiLanguage : "en";
+      const t = (key: MessageKey, params: MessageParams = {}) => {
+        if (!localized) return translate("en", key, params);
+        const message = resolveMessage(uiLanguage, key, params);
+        if (message.usedFallback) h.uiLanguageWarning = "unavailable";
+        return message.text;
+      };
       const displayNames: Record<string, string> = {
         longrun: "Longrun",
         autoskills: "AutoSkills",
@@ -359,220 +404,413 @@ export function register(
         subagents: "Subagent Router",
         mcprouter: "MCP Router",
       };
-      const displayName = displayNames[command] ?? extension;
-      const groups = h.service.menuGroups ?? {
+      const displayName = localized
+        ? t("appName")
+        : displayNames[command] ?? extension;
+      const sourceGroups = h.service.menuGroups ?? {
         Actions: h.service.menu,
         Settings: ["mode", "doctor"],
       };
-      const options = [
-        {
-          action: "auto",
-          label: "Automatic",
-          description:
-            h.service.modeDescriptions?.auto ??
-            "Allow eligible actions when this extension's policy permits.",
-        },
-        {
-          action: "observe",
-          label: "Observe",
-          description:
-            h.service.modeDescriptions?.observe ??
-            "Show decisions without acting automatically.",
-        },
-        {
-          action: "off",
-          label: "Off",
-          description:
-            h.service.modeDescriptions?.off ??
-            "Disable this extension's automatic behavior.",
-        },
-      ];
-      const formatKey = (key: string) =>
-        ({
-          enter: "Enter",
-          return: "Enter",
-          escape: "Esc",
-          "ctrl+c": "Ctrl+C",
-          up: "↑",
-          down: "↓",
-        })[key.toLowerCase()] ?? key.toUpperCase();
-      const keyText = (keys: string[], fallback: string) =>
-        keys.map(formatKey).join(" / ") || fallback;
-      const currentMode = () =>
+      const groups = Object.fromEntries(
+        Object.entries(sourceGroups).map(([group, actions]) => [group, [...actions]]),
+      );
+      const hasLanguageSetting = localized && h.trusted;
+      if (localized && groups.Settings && hasLanguageSetting && !groups.Settings.includes("language"))
+        groups.Settings.push("language");
+      const groupKeys: Record<string, MessageKey> = {
+        Execution: "groupExecution",
+        Progress: "groupProgress",
+        Recovery: "groupRecovery",
+        Settings: "groupSettings",
+        Actions: "groupActions",
+      };
+      const actionKeys: Record<string, MessageKey> = {
+        status: "actionStatus",
+        start: "actionStart",
+        pause: "actionPause",
+        resume: "actionResume",
+        stop: "actionStop",
+        tasks: "actionTasks",
+        inspect: "actionInspect",
+        verify: "actionVerify",
+        "gate status": "actionGateStatus",
+        "gate verify": "actionGateVerify",
+        recover: "actionRecover",
+        mode: "actionMode",
+        doctor: "actionDoctor",
+        language: "actionLanguage",
+      };
+      const groupLabel = (group: string) =>
+        localized && groupKeys[group] ? t(groupKeys[group]!) : group;
+      const actionLabel = (action: string) =>
+        localized && actionKeys[action] ? t(actionKeys[action]!) : action;
+      const appTitle = displayName;
+      const modes = ["auto", "observe", "off"] as const;
+      type Mode = "auto" | "observe" | "off";
+      const currentMode = (): Mode =>
         !h.config.enabled || h.config.mode === "off"
           ? "off"
           : h.config.mode === "observe"
             ? "observe"
             : "auto";
+      const modeLabel = (mode: string) =>
+        mode === "observe"
+          ? t("modeObserve")
+          : mode === "off"
+            ? t("modeOff")
+            : t("modeAuto");
+      const modeOptions = () =>
+        modes.map((action) => ({
+          action,
+          label: modeLabel(action),
+          description:
+            action === "auto"
+              ? localized
+                ? t("modeAutoDescription")
+                : h.service.modeDescriptions?.auto ??
+                  "Continue eligible runs within saved budgets and acceptance gates."
+              : action === "observe"
+                ? localized
+                  ? t("modeObserveDescription")
+                  : h.service.modeDescriptions?.observe ??
+                    "Show Longrun decisions without continuing runs automatically."
+                : localized
+                  ? t("modeOffDescription")
+                  : h.service.modeDescriptions?.off ??
+                    "Disable Longrun automatic behavior.",
+        }));
+      const languageOptions = () =>
+        ([
+          { value: "en" as const, label: t("languageEnglish") },
+          { value: "pt-BR" as const, label: t("languagePortuguese") },
+        ]) as { value: UiLanguage; label: string }[];
+      const languageLabel = (language: UiLanguage) =>
+        language === "pt-BR" ? t("languagePortuguese") : t("languageEnglish");
+      const warningText = () =>
+        h.uiLanguageWarning === "invalid"
+          ? t("languageWarningInvalid")
+          : h.uiLanguageWarning === "unavailable"
+            ? t("languageWarningUnavailable")
+            : "";
+      const panelCopy = (): PanelCopy => ({
+        back: t("panelBack"),
+        authorize: t("panelAuthorize"),
+        operationCanceled: t("panelOperationCanceled"),
+        canceling: t("panelCanceling"),
+        unsaved: t("panelUnsaved"),
+        operationFailed: t("panelOperationFailed"),
+        working: t("panelWorking"),
+        dialogHints: t("panelDialogHints"),
+        footerHints: t("panelFooterHints"),
+      });
+      const inputTitleFor = (action: string) =>
+        localized && action === "start"
+          ? t("inputGoal")
+          : h.service.menuInputs?.[action];
+      const commandContext = (signal?: AbortSignal) => ({
+        cwd: ctx.cwd,
+        trusted: ctx.isProjectTrusted(),
+        hostContext: ctx,
+        commandContext: ctx,
+        signal,
+      });
 
-      const showModePanel = async () => {
-        let activeAction = currentMode();
-        let selectedIndex = options.findIndex(
-          (option) => option.action === activeAction,
-        );
-        let status = "";
-        await ctx.ui.custom<void>(
-          (tui, theme, keybindings, done) => {
-            let saving = false;
-            const confirmKeys = keyText(
-              keybindings.getKeys("tui.select.confirm"),
-              "Enter",
-            );
-            const cancelKeys = keyText(
-              keybindings.getKeys("tui.select.cancel"),
-              "Esc",
-            );
-            const upKeys = keyText(keybindings.getKeys("tui.select.up"), "↑");
-            const downKeys = keyText(
-              keybindings.getKeys("tui.select.down"),
-              "↓",
-            );
-            const fit = (line: string, width: number) =>
-              line.length <= width
-                ? line
-                : line.slice(0, Math.max(0, width - 1)) + "…";
-
-            return {
-              render(width) {
-                const current =
-                  options.find((option) => option.action === activeAction) ??
-                  options[0]!;
-                const selected = options[selectedIndex]!;
-                const lines = [
-                  `${displayName} / Settings / Mode`,
-                  "",
-                  `Current mode: ${current.label}`,
-                  "",
-                  "Choose a mode",
-                  ...options.map(
-                    (option, index) =>
-                      `${index === selectedIndex ? "›" : " "} ${option.label}${
-                        option.action === activeAction ? "  (current)" : ""
-                      }`,
-                  ),
-                  "",
-                  selected.description,
-                  "",
-                  `${upKeys} / ${downKeys} Move    ${confirmKeys} Save    ${cancelKeys} Back`,
-                  status,
-                ];
-                return lines.map((line, index) => {
-                  const visible = fit(line, width).padEnd(width, " ");
-                  const selectedRow = index === 5 + selectedIndex;
-                  const foreground =
-                    [0, 4].includes(index) || selectedRow
-                      ? theme.fg("accent", theme.bold(visible))
-                      : theme.fg("toolOutput", visible);
-                  return theme.bg("toolPendingBg", foreground);
-                });
-              },
-              invalidate() {},
-              async handleInput(data) {
-                if (keybindings.matches(data, "tui.select.cancel")) {
-                  done(undefined);
-                  return;
-                }
-                if (keybindings.matches(data, "tui.select.up")) {
-                  selectedIndex =
-                    (selectedIndex + options.length - 1) % options.length;
-                  tui.requestRender();
-                  return;
-                }
-                if (keybindings.matches(data, "tui.select.down")) {
-                  selectedIndex = (selectedIndex + 1) % options.length;
-                  tui.requestRender();
-                  return;
-                }
-                if (saving || !keybindings.matches(data, "tui.select.confirm"))
-                  return;
-                saving = true;
-                try {
-                  const selected = options[selectedIndex]!;
-                  await h.serial(() =>
-                    h.command(selected.action, [], {
-                      cwd: ctx.cwd,
-                      trusted: ctx.isProjectTrusted(),
-                      hostContext: ctx,
-                      commandContext: ctx,
-                      signal: ctx.signal,
-                    }),
-                  );
-                  activeAction = selected.action;
-                  status = `Saved: ${selected.label}.`;
-                } catch {
-                  status = "Could not save the mode. Try again.";
-                } finally {
-                  saving = false;
-                  tui.requestRender();
-                }
-              },
-            };
-          },
-          {
-            overlay: true,
-            overlayOptions: {
-              width: "72%",
-              maxHeight: 15,
-              anchor: "center",
-              margin: 1,
-            },
-          },
-        );
+      const saveModeDraft = async (mode: Mode, signal: AbortSignal) => {
+        await h.serial(() => h.command(mode, [], commandContext(signal)));
       };
 
-      const runMenu = async (initialGroup?: string) => {
+      const fallbackModePanel = async () => {
+        while (true) {
+          const savedMode = currentMode();
+          const options = modeOptions();
+          const selected = await ctx.ui.select(
+            localized
+              ? t("modeCurrent", { app: appTitle, mode: modeLabel(savedMode) })
+              : `${displayName} / Settings / Mode — current: ${modeLabel(savedMode)}`,
+            options.map((option) => option.label),
+          );
+          if (!selected) return;
+          const draft = options.find((option) => option.label === selected);
+          if (!draft) return;
+          const decision = await ctx.ui.select(
+            localized
+              ? t("modeDraftTitle", { mode: draft.label })
+              : `Mode draft: ${draft.label}`,
+            localized
+              ? [t("modeSaveDraft"), t("modeDiscardDraft")]
+              : ["Save draft", "Discard draft"],
+          );
+          if (decision !== (localized ? t("modeSaveDraft") : "Save draft"))
+            continue;
+          try {
+            await saveModeDraft(
+              draft.action as Mode,
+              ctx.signal ?? new AbortController().signal,
+            );
+            return;
+          } catch {
+            ctx.ui.notify(
+              localized
+                ? t("modeSaveNotice")
+                : "Could not save the mode draft. It is still available.",
+            );
+          }
+        }
+      };
+
+      const fallbackLanguagePanel = async () => {
+        if (!hasLanguageSetting) return;
+        const options = languageOptions();
+        const selected = await ctx.ui.select(
+          t("languageCurrent", {
+            app: appTitle,
+            language: options.find((option) => option.value === h.uiLanguage)?.label ?? options[0]!.label,
+          }),
+          options.map((option) => option.label),
+        );
+        const draft = options.find((option) => option.label === selected);
+        if (!draft) return;
+        const decision = await ctx.ui.select(
+          t("languageDraftTitle", { language: draft.label }),
+          [t("modeSaveDraft"), t("modeDiscardDraft")],
+        );
+        if (decision !== t("modeSaveDraft")) return;
+        try {
+          await h.saveUiLanguage(draft.value);
+          uiLanguage = draft.value;
+          ctx.ui.notify(t("languageSaved", { language: draft.label }));
+        } catch {
+          ctx.ui.notify(t("languageSaveNotice"));
+        }
+      };
+
+      const runFallbackMenu = async (initialGroup?: string) => {
         let group = initialGroup;
         while (true) {
           if (!group) {
-            group = await ctx.ui.select(displayName, Object.keys(groups));
+            const rootTitle = warningText()
+              ? `${displayName} — ${warningText()}`
+              : displayName;
+            const selectedGroup = await ctx.ui.select(
+              rootTitle,
+              Object.keys(groups).map(groupLabel),
+            );
+            if (!selectedGroup) return;
+            group = Object.keys(groups).find(
+              (candidate) => groupLabel(candidate) === selectedGroup,
+            );
             if (!group) return;
           }
           const selected = await ctx.ui.select(
-            `${displayName} / ${group}`,
-            groups[group] ?? [],
+            `${displayName} / ${groupLabel(group)}`,
+            (groups[group] ?? []).map(actionLabel),
           );
           if (!selected) {
             group = undefined;
             continue;
           }
-
-          const selectedParts = selected.split(/\s+/);
-          const selectedAction = selectedParts[0] ?? "status";
+          const selectedAction = (groups[group] ?? []).find(
+            (candidate) => actionLabel(candidate) === selected,
+          );
+          if (!selectedAction) continue;
           if (selectedAction === "mode" || selectedAction === "config") {
-            await showModePanel();
+            await fallbackModePanel();
             continue;
           }
-
-          const inputTitle = h.service.menuInputs?.[selected];
+          if (selectedAction === "language") {
+            await fallbackLanguagePanel();
+            continue;
+          }
+          const parts = selectedAction.split(/\s+/);
+          const inputTitle = inputTitleFor(selectedAction);
           if (inputTitle) {
             const value = await ctx.ui.input(inputTitle);
             if (!value?.trim()) continue;
-            selectedParts.push(value.trim());
+            parts.push(value.trim());
           }
-          const menuAction = selectedParts.shift() ?? "status";
+          const action = parts.shift() ?? "status";
           const result = await h.serial(() =>
-            h.command(menuAction, selectedParts, {
-              cwd: ctx.cwd,
-              trusted: ctx.isProjectTrusted(),
-              hostContext: ctx,
-              commandContext: ctx,
-              signal: ctx.signal,
-            }),
+            h.command(action, parts, commandContext(ctx.signal)),
           );
           show(result);
         }
       };
 
+      const showDashboard = async (initialGroup?: string) => {
+        if (typeof ctx.ui.custom !== "function") {
+          await runFallbackMenu(initialGroup);
+          return;
+        }
+        let draftMode: Mode = currentMode();
+        let savedMode: Mode = draftMode;
+        let draftLanguage = h.uiLanguage;
+        let savedLanguage = draftLanguage;
+        const menuGroups = initialGroup
+          ? { [initialGroup]: groups[initialGroup] ?? [] }
+          : groups;
+        const rows: PanelRow[] = [];
+        const refreshRows = () => {
+          const nextRows: PanelRow[] = Object.entries(menuGroups).map(
+            ([group, actions]) => ({
+              id: `group:${group}`,
+              label: groupLabel(group),
+              value: () =>
+                localized
+                  ? t("menuActionsCount", { count: actions.length })
+                  : `${actions.length} actions`,
+              description: localized
+                ? t("menuOpenGroup", { group: groupLabel(group).toLowerCase() })
+                : `Open ${group.toLowerCase()} actions.`,
+            activate: async (panel, signal) => {
+              const selected = await panel.choose(
+                `${displayName} / ${groupLabel(group)}`,
+                actions.map((action) => ({ value: action, label: actionLabel(action) })),
+              );
+              if (!selected) return;
+              if (selected === "mode" || selected === "config") {
+                const options = modeOptions();
+                const mode = await panel.choose(
+                  localized
+                    ? t("modeTitle", { app: appTitle })
+                    : `${displayName} / Settings / Mode`,
+                  options.map((option) => ({
+                    value: option.action,
+                    label: option.label,
+                  })),
+                  draftMode,
+                );
+                if (!mode) return;
+                draftMode = mode as Mode;
+                panel.report(
+                  localized
+                    ? t("modeDraft", { mode: modeLabel(draftMode) })
+                    : `Mode draft: ${modeLabel(draftMode)}. Ctrl+S saves the change.`,
+                );
+                return;
+              }
+              if (selected === "language" && hasLanguageSetting) {
+                const options = languageOptions();
+                const selectedLanguage = await panel.choose(
+                  t("languageTitle", { app: appTitle }),
+                  options,
+                  draftLanguage,
+                );
+                if (!selectedLanguage) return;
+                draftLanguage = selectedLanguage as UiLanguage;
+                uiLanguage = draftLanguage;
+                refreshRows();
+                settings.copy = panelCopy();
+                settings.title = initialGroup
+                  ? `${displayName} / ${groupLabel(initialGroup)}`
+                  : displayName;
+                panel.report(
+                  t("languageDraft", {
+                    language:
+                      options.find((option) => option.value === draftLanguage)?.label ??
+                      draftLanguage,
+                  }),
+                );
+                return;
+              }
+              const parts = selected.split(/\s+/);
+              const inputTitle = inputTitleFor(selected);
+              if (inputTitle) {
+                const value = await panel.input(inputTitle, "");
+                if (!value?.trim() || signal.aborted) return;
+                parts.push(value.trim());
+              }
+              const action = parts.shift() ?? "status";
+              const result = await h.serial(() =>
+                h.command(action, parts, commandContext(signal)),
+              );
+              if (signal.aborted) return;
+              show(result);
+              panel.report(
+                localized
+                  ? t("completed", { action: actionLabel(selected) })
+                  : `${selected} completed; its result is shown above.`,
+              );
+            },
+            }),
+          );
+          rows.splice(0, rows.length, ...nextRows);
+        };
+        refreshRows();
+        const settings: PanelOptions = {
+          title: initialGroup
+            ? `${displayName} / ${groupLabel(initialGroup)}`
+            : displayName,
+          summary: () => {
+            const drafts: string[] = [];
+            if (draftMode !== savedMode)
+              drafts.push(t("menuDraftSuffix", { value: modeLabel(draftMode) }));
+            if (draftLanguage !== savedLanguage)
+              drafts.push(
+                t("menuDraftSuffix", { value: languageLabel(draftLanguage) }),
+              );
+            const summary = localized
+              ? t("menuSummary", {
+                  mode: modeLabel(savedMode),
+                  language: languageLabel(savedLanguage),
+                  draft: drafts.join(" "),
+                })
+              : `Mode: ${modeLabel(savedMode)}${draftMode !== savedMode ? ` → draft ${modeLabel(draftMode)}` : ""}`;
+            const warning = warningText();
+            return warning ? `${summary} · ${warning}` : summary;
+          },
+          rows,
+          dirty: () => draftMode !== savedMode || draftLanguage !== savedLanguage,
+          signal: ctx.signal ?? new AbortController().signal,
+          ...(localized ? { copy: panelCopy() } : {}),
+          save: async (panel, signal) => {
+            if (draftMode === savedMode && draftLanguage === savedLanguage) {
+              panel.report(localized ? t("modeNoUnsaved") : "No unsaved settings.");
+              return;
+            }
+            const languageChanged = draftLanguage !== savedLanguage;
+            const modeChanged = draftMode !== savedMode;
+            if (languageChanged) {
+              await h.saveUiLanguage(draftLanguage);
+              savedLanguage = draftLanguage;
+              uiLanguage = draftLanguage;
+              h.uiLanguageWarning = undefined;
+              settings.copy = panelCopy();
+              refreshRows();
+            }
+            const next = draftMode;
+            if (modeChanged) {
+              await saveModeDraft(next, signal);
+              savedMode = next;
+            }
+            panel.report(
+              localized
+                ? languageChanged && modeChanged
+                  ? t("settingsSaved")
+                  : languageChanged
+                    ? t("languageSaved", { language: languageLabel(savedLanguage) })
+                    : t("modeSaved", { mode: modeLabel(savedMode) })
+                : `Saved: ${modeLabel(savedMode)}.`,
+            );
+          },
+          formatError: () =>
+            localized
+              ? draftLanguage !== savedLanguage
+                ? t("languageSaveError")
+                : t("modeSaveError")
+              : "Could not save the mode. The draft is still available. Try again.",
+        };
+        await openSettingsPanel(ctx.ui, settings);
+      };
+
       let parts = args.trim().split(/\s+/).filter(Boolean);
       if (interactive && parts.length === 0) {
-        await runMenu();
+        await showDashboard();
         return;
       }
       let action = parts.shift() ?? "status";
       if (action === "mode") action = "config";
       if (action === "config" && interactive) {
-        await showModePanel();
-        await runMenu("Settings");
+        await showDashboard("Settings");
         return;
       }
       const result = await h.serial(() =>

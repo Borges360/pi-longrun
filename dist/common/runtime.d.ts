@@ -2,6 +2,7 @@ import type { ExtensionAPI, ExtensionContext, ExtensionCommandContext, ToolDefin
 import { type Config } from "./config.js";
 import { type StorageBase } from "./storage.js";
 import { Interop, type EventBus } from "./contracts.js";
+import { type UiLanguage } from "./i18n.js";
 export interface CommandContext {
     cwd: string;
     trusted: boolean;
@@ -46,6 +47,8 @@ export declare class Host {
     readonly trusted: boolean;
     readonly api?: ExtensionAPI | undefined;
     config: Config;
+    uiLanguage: UiLanguage;
+    uiLanguageWarning?: "invalid" | "unavailable";
     store: StorageBase;
     interop: Interop;
     service: Service;
@@ -106,6 +109,7 @@ export declare class Host {
         maxRepairAttempts: number;
         gateTimeoutMs: number;
     }>;
+    saveUiLanguage(language: UiLanguage): Promise<void>;
     doctor(): Promise<{
         extension: string;
         version: string;
